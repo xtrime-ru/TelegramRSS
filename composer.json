@@ -1,0 +1,37 @@
+{
+    "name": "xtrime-ru/telegramrss",
+    "description": "Fast, simple, async PHP Telegram RSS & JSON server",
+    "type": "project",
+    "homepage": "http://tg.i-c-a.su/",
+    "license": "MIT",
+    "keywords": ["telegram", "mtproto", "protocol", "client", "PHP", "swoole", "async", "daemon", "coroutine", "parser", "micro-service", "RSS"],
+    "require": {
+        "php": ">=7.2.0",
+        "vlucas/phpdotenv": "^2.4",
+        "jaeger/querylist": "dev-master",
+        "ext-json": "*",
+        "ext-swoole": ">=4.0",
+        "php-curl-class/php-curl-class": "dev-master"
+    },
+    "require-dev": {
+        "swoole/ide-helper": "dev-master"
+    },
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://github.com/swoole/ide-helper.git"
+        }
+    ],
+    "minimum-stability": "dev",
+    "authors": [
+        {
+            "name": "Alexander Pankratov",
+            "email": "alexander@i-c-a.su"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "TelegramRSS\\": "app/"
+        }
+    }
+}
