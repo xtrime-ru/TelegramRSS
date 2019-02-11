@@ -52,14 +52,14 @@ class Client
 	    $this->curl->get($address, $parameters);
 
 	    if ($this->curl->error) {
-			throw new \Exception($this->curl->errorMessage, $this->curl->errorCode);
+			throw new \UnexpectedValueException($this->curl->errorMessage, $this->curl->errorCode);
 	    } else {
 	    	/** @var \stdClass $result */
 		    $result = $this->curl->response;
 	    	if ($result && !empty($result->success) && !empty($result->response)) {
 			    $result = $result->response;
 		    } else {
-			    $result = (object) [];
+			    throw new \UnexpectedValueException($this->curl->errorMessage, $this->curl->errorCode);
 		    }
 		    return $result;
 	    }
