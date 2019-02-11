@@ -17,21 +17,18 @@ class Controller
 			'headers' => [
 				['Content-Type', 'text/html;charset=utf-8'],
 			],
-			'data' => null,
 		],
 		'rss'=>[
 			'type'=> 'rss',
 			'headers' => [
 				['Content-Type', 'application/rss+xml;charset=utf-8'],
 			],
-			'data' => null,
 		],
 		'json'=>[
 			'type'=> 'json',
 			'headers' => [
 				['Content-Type', 'application/json;charset=utf-8'],
 			],
-			'data' => null,
 		]
 	];
 
