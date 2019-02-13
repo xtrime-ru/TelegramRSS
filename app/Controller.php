@@ -6,6 +6,7 @@ class Controller
 {
 	/** @var array */
 	private $request = [
+		'ip' => '',
 		'peer' => '',
 		'limit' => 10,
 		'images' => true,
@@ -49,7 +50,8 @@ class Controller
         //Parse request and generate response
 
 	    $this
-		    ->parseRequestUri($request)
+		    ->parseRequest($request)
+		    ->validate()
 		    ->generateResponse($client)
 		    ->checkErrors()
 	        ->encodeResponse()
@@ -68,7 +70,9 @@ class Controller
 	 * @param \Swoole\Http\Request $request
 	 * @return Controller
 	 */
-    private function parseRequestUri(\Swoole\Http\Request $request):self {
+    private function parseRequest(\Swoole\Http\Request $request):self {
+
+    	$this->request['ip'] = $request->server['remote_addr'];
 
 	    $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
 
@@ -79,12 +83,30 @@ class Controller
 
 	    if (array_key_exists($path[0], $this->responseList)) {
 	    	$this->response['type'] = $this->responseList[$path[0]]['type'];
-		    $this->request['peer'] = $path[1];
+		    $this->request['peer'] = urldecode($path[1]);
 	    } else {
 		    $this->response['errors'][] = 'Unknown response format';
 	    }
 
 	    return $this;
+    }
+
+    private function validate(){
+
+	    if (preg_match('/[^\w\-]/', $this->request['peer'])){
+		    $this->response['errors'][] = "WRONG NAME";
+	    }
+
+	    if (preg_match('/bot$/i', $this->request['peer'])){
+		    $this->response['errors'][] = "BOTS NOT ALLOWED";
+	    }
+
+	    if (preg_match('/[A-Z]/', $this->request['peer'])) {
+		    $this->response['errors'][] = "UPPERCASE NOT SUPPORTED";
+	    }
+
+	    //TODO: search ip in blacklist.
+    	return $this;
     }
 
 	/**
@@ -100,6 +122,9 @@ class Controller
 		try {
 			if ($this->request['peer']) {
 				$this->response['data'] = $client->getHistory(['peer' => $this->request['peer']]);
+				if ($this->response['data']->_ !== 'messages.channelMessages') {
+					throw new \UnexpectedValueException('This is not a channel');
+				}
 			}
 		} catch (\Exception $e) {
 			$this->response['errors'][] = [
@@ -131,27 +156,40 @@ class Controller
 	 *
 	 * @return Controller
 	 */
-	public function encodeResponse(): self
+	public function encodeResponse($firstRun = true): self
 	{
-		switch ($this->response['type']) {
-			case 'html':
-				$result = file_get_contents($this->indexPage);
-				break;
-			case 'json':
-				$result = json_encode(
-					$this->response['data'],
-					JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-				);
-				break;
-			case 'rss':
-				$result = 'Work In Progress...';
-				break;
-			default:
-				$result = 'Unknown response type';
+		try{
+			switch ($this->response['type']) {
+				case 'html':
+					$result = file_get_contents($this->indexPage);
+					break;
+				case 'json':
+					$result = json_encode(
+						$this->response['data'],
+						JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+					);
+					break;
+				case 'rss':
+					$messages = new Messages($this->response['data']);
+					$rss = new RSS($messages->get());
+					$result = $rss->get();
+					break;
+				default:
+					$result = 'Unknown response type';
+			}
+
+			$this->response['data'] = $result;
+			$this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
+		} catch (\Exception $e){
+			$this->response['errors'][] = [
+				'code' => $e->getCode(),
+				'message' => $e->getMessage(),
+			];
+			if ($firstRun){
+				$this->checkErrors()->encodeResponse(false);
+			}
 		}
 
-		$this->response['data'] = $result;
-		$this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
 
 		return $this;
 	}

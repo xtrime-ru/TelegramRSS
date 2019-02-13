@@ -10,6 +10,8 @@
         "vlucas/phpdotenv": "^2.4",
         "jaeger/querylist": "dev-master",
         "ext-json": "*",
+        "ext-dom": "*",
+        "ext-simplexml": "*",
         "ext-swoole": ">=4.0",
         "php-curl-class/php-curl-class": "dev-master"
     },

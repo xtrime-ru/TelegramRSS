@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "84465a6586085c43c3b7b2bc76403bfc",
+    "content-hash": "ce1491771212e799dca9c91cccc84a3f",
     "packages": [
         {
             "name": "cache/adapter-common",
@@ -1138,16 +1138,16 @@
         },
         {
             "name": "tightenco/collect",
-            "version": "v5.7.25",
+            "version": "v5.7.26",
             "source": {
                 "type": "git",
                 "url": "https://github.com/tightenco/collect.git",
-                "reference": "bcdb1d4ca989a3aaa74aeac67c8e44ccf1761b9d"
+                "reference": "c1a36a2a8a0aa731c1acdcd83f57724ffe630d00"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/tightenco/collect/zipball/bcdb1d4ca989a3aaa74aeac67c8e44ccf1761b9d",
-                "reference": "bcdb1d4ca989a3aaa74aeac67c8e44ccf1761b9d",
+                "url": "https://api.github.com/repos/tightenco/collect/zipball/c1a36a2a8a0aa731c1acdcd83f57724ffe630d00",
+                "reference": "c1a36a2a8a0aa731c1acdcd83f57724ffe630d00",
                 "shasum": ""
             },
             "require": {
@@ -1184,7 +1184,7 @@
                 "collection",
                 "laravel"
             ],
-            "time": "2019-02-05T15:00:41+00:00"
+            "time": "2019-02-13T19:40:13+00:00"
         },
         {
             "name": "vlucas/phpdotenv",
@@ -1273,6 +1273,8 @@
     "platform": {
         "php": ">=7.2.0",
         "ext-json": "*",
+        "ext-dom": "*",
+        "ext-simplexml": "*",
         "ext-swoole": ">=4.0"
     },
     "platform-dev": []
