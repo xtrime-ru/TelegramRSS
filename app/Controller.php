@@ -30,6 +30,10 @@ class Controller
 			'headers' => [
 				['Content-Type', 'application/json;charset=utf-8'],
 			],
+		],
+		'media'=>[
+			'type'=>'media',
+			'headers' => []
 		]
 	];
 
@@ -40,6 +44,7 @@ class Controller
 		'headers'=>[],
 		'code' => 200,
 		'data' => null,
+		'file' => null,
 	];
 
 	private $indexPage = __DIR__ . '/../index.html';
@@ -58,12 +63,19 @@ class Controller
 	    ;
 
 
+	    $response->status($this->response['code']);
+
 	    foreach ($this->response['headers'] as $header) {
 		    $response->header(...$header);
 	    }
 
-        $response->status($this->response['code']);
-        $response->end($this->response['data']);
+	    if ($this->response['file']) {
+	    	$response->sendfile($this->response['file']);
+	    	unset($this->response['file']);
+	    } else {
+		    $response->end($this->response['data']);
+	    }
+
     }
 
 	/**
@@ -76,7 +88,7 @@ class Controller
 
 	    $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
 
-	    if (!is_array($path) || count($path) !== 2) {
+	    if (!is_array($path) || count($path) < 2) {
 		    $this->response['type'] = 'html';
 		    return $this;
 	    }
@@ -88,12 +100,19 @@ class Controller
 		    $this->response['errors'][] = 'Unknown response format';
 	    }
 
+	    if ($this->response['type'] === 'media') {
+		    $this->request['message'] = (int) ($path[2] ?? 0);
+		    if (!$this->request['message']) {
+			    $this->response['errors'][] = 'Unknown message id';
+		    }
+	    }
+
 	    return $this;
     }
 
     private function validate(){
 
-	    if (preg_match('/[^\w\-]/', $this->request['peer'])){
+	    if (preg_match('/[^\w\-@#]/', $this->request['peer'])){
 		    $this->response['errors'][] = "WRONG NAME";
 	    }
 
@@ -120,12 +139,20 @@ class Controller
 		}
 
 		try {
-			if ($this->request['peer']) {
+			if ($this->response['type'] === 'media') {
+				$this->response['data'] = $client->getMedia([
+					'channel' => $this->request['peer'],
+					'id' => [
+						$this->request['message'],
+					]
+				]);
+			} elseif ($this->request['peer']) {
 				$this->response['data'] = $client->getHistory(['peer' => $this->request['peer']]);
 				if ($this->response['data']->_ !== 'messages.channelMessages') {
 					throw new \UnexpectedValueException('This is not a channel');
 				}
 			}
+
 		} catch (\Exception $e) {
 			$this->response['errors'][] = [
 				'code' => $e->getCode(),
@@ -161,10 +188,10 @@ class Controller
 		try{
 			switch ($this->response['type']) {
 				case 'html':
-					$result = file_get_contents($this->indexPage);
+					$this->response['data'] = file_get_contents($this->indexPage);
 					break;
 				case 'json':
-					$result = json_encode(
+					$this->response['data'] = json_encode(
 						$this->response['data'],
 						JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
 					);
@@ -172,14 +199,20 @@ class Controller
 				case 'rss':
 					$messages = new Messages($this->response['data']);
 					$rss = new RSS($messages->get());
-					$result = $rss->get();
+					$this->response['data'] = $rss->get();
+					break;
+				case 'media':
+					$this->response['file'] = $this->response['data']->file;
+					$this->response['headers'] = $this->response['data']->headers;
+					$this->response['data'] = null;
 					break;
 				default:
-					$result = 'Unknown response type';
+					$this->response['data'] = 'Unknown response type';
 			}
 
-			$this->response['data'] = $result;
-			$this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
+			if (!$this->response['headers']) {
+				$this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
+			}
 		} catch (\Exception $e){
 			$this->response['errors'][] = [
 				'code' => $e->getCode(),
