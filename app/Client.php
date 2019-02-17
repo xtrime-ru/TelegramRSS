@@ -52,14 +52,19 @@ class Client
 	    $this->curl->get($address, $parameters);
 
 	    if ($this->curl->error) {
-			throw new \UnexpectedValueException($this->curl->errorMessage, $this->curl->errorCode);
+	    	if (!empty($this->curl->response->errors[0]->message)){
+	    		$message = 'Telegram client error: ' . $this->curl->response->errors[0]->message;
+			    throw new \UnexpectedValueException($message, $this->curl->response->errors[0]->code ?? 400);
+		    } else {
+			    throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
+		    }
 	    } else {
 	    	/** @var \stdClass $result */
 		    $result = $this->curl->response;
-	    	if ($result && !empty($result->success) && !empty($result->response)) {
+	    	if (!empty($result->response)) {
 			    $result = $result->response;
 		    } else {
-			    throw new \UnexpectedValueException($this->curl->errorMessage, $this->curl->errorCode);
+			    throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
 		    }
 		    return $result;
 	    }
