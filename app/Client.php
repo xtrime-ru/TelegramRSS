@@ -98,7 +98,6 @@ class Client
 		    'id' => [0],
 	    ],$data);
 
-	    $result = $this->get('getMedia', ['data'=>$data]);
-	    return $result;
+	    return $this->get('getMedia', ['data'=>$data]);
     }
 }
