@@ -71,7 +71,7 @@ class Controller
 
 	    if ($this->response['file']) {
 	    	$response->sendfile($this->response['file']);
-	    	unset($this->response['file']);
+	    	unlink($this->response['file']);
 	    } else {
 		    $response->end($this->response['data']);
 	    }
