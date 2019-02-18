@@ -9,7 +9,8 @@ class Controller
 		'ip' => '',
 		'peer' => '',
 		'limit' => 10,
-		'images' => true,
+		'message'=>0,
+		'preview'=>false,
 	];
 
 	private $responseList = [
@@ -105,6 +106,7 @@ class Controller
 		    if (!$this->request['message']) {
 			    $this->response['errors'][] = 'Unknown message id';
 		    }
+		    $this->request['preview'] = ($path[3] ?? '') === 'preview';
 	    }
 
 	    return $this;
@@ -140,12 +142,18 @@ class Controller
 
 		try {
 			if ($this->response['type'] === 'media') {
-				$this->response['data'] = $client->getMedia([
+				$data = [
 					'channel' => $this->request['peer'],
 					'id' => [
 						$this->request['message'],
-					]
-				]);
+					],
+				];
+				if ($this->request['preview']){
+					$this->response['data'] = $client->getMediaPreview($data);
+				} else {
+					$this->response['data'] = $client->getMedia($data);
+
+				}
 			} elseif ($this->request['peer']) {
 				$this->response['data'] = $client->getHistory(['peer' => $this->request['peer']]);
 				if ($this->response['data']->_ !== 'messages.channelMessages') {

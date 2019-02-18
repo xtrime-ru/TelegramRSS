@@ -100,4 +100,13 @@ class Client
 
 	    return $this->get('getMedia', ['data'=>$data]);
     }
+
+	public function getMediaPreview($data){
+		$data = array_merge([
+			'channel' =>'',
+			'id' => [0],
+		],$data);
+
+		return $this->get('getMediaPreview', ['data'=>$data]);
+	}
 }
