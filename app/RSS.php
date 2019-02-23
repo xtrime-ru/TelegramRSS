@@ -4,21 +4,30 @@ namespace TelegramRSS;
 
 
 class RSS {
-    private $rss;
     private const TITLE = 'ICA telegram feed';
     private const DESCRIPTION = 'Публичный канал Telegram в формате RSS';
     private const LINK = 'https://i-c-a.su';
 
-    public function __construct($messages, $selfLink)
+    /** @var string */
+    private $rss;
+
+    /**
+     * RSS constructor.
+     * @param array $messages
+     * @param string $selfLink
+     */
+    public function __construct(array $messages, string $selfLink)
     {
         $this->createRss($messages, $selfLink);
     }
 
     /**
-     * @param $messages
+     * @param array $messages
+     * @param string $selfLink
      * @return $this
      */
-    private function createRss($messages, $selfLink){
+    private function createRss(array $messages, string $selfLink): self
+    {
         $latestDate = 0;
         foreach ($messages as $message) {
             if ($message['timestamp'] > $latestDate) $latestDate = $message['timestamp'];
@@ -81,7 +90,11 @@ class RSS {
         return $this;
     }
 
-    public function get(){
+    /**
+     * @return string
+     */
+    public function get(): string
+    {
         return $this->rss;
     }
 }
