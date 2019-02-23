@@ -3,7 +3,7 @@
 require_once __DIR__ . '/bootstrap.php';
 
 if (PHP_SAPI !== 'cli') {
-    throw new \Exception('Start in CLI');
+    throw new \RuntimeException('Start in CLI');
 }
 
 $shortopts = 's::p::c::o';
