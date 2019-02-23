@@ -50,6 +50,12 @@ class Controller
 
 	private $indexPage = __DIR__ . '/../index.html';
 
+    /**
+     * Controller constructor.
+     * @param \Swoole\Http\Request $request
+     * @param \Swoole\Http\Response $response
+     * @param Client $client
+     */
     public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client)
     {
 
@@ -60,7 +66,7 @@ class Controller
 		    ->validate()
 		    ->generateResponse($client)
 		    ->checkErrors()
-	        ->encodeResponse()
+	        ->encodeResponse(true, $client)
 	    ;
 
 
@@ -152,7 +158,6 @@ class Controller
 					$this->response['data'] = $client->getMediaPreview($data);
 				} else {
 					$this->response['data'] = $client->getMedia($data);
-
 				}
 			} elseif ($this->request['peer']) {
 				$this->response['data'] = $client->getHistory(['peer' => $this->request['peer']]);
@@ -186,12 +191,14 @@ class Controller
 		return $this;
 	}
 
-	/**
-	 * Кодирует ответ в нужный формат: json
-	 *
-	 * @return Controller
-	 */
-	public function encodeResponse($firstRun = true): self
+    /**
+     * Кодирует ответ в нужный формат: json
+     *
+     * @param bool $firstRun
+     * @param Client $client
+     * @return Controller
+     */
+	public function encodeResponse($firstRun = true, Client $client): self
 	{
 		try{
 			switch ($this->response['type']) {
@@ -205,8 +212,10 @@ class Controller
 					);
 					break;
 				case 'rss':
-					$messages = new Messages($this->response['data']);
-					$rss = new RSS($messages->get());
+				    $url = Config::getInstance()->get('url');
+				    $selfLink = "$url/rss/{$this->request['peer']}";
+					$messages = new Messages($this->response['data'], $client);
+					$rss = new RSS($messages->get(), $selfLink);
 					$this->response['data'] = $rss->get();
 					break;
 				case 'media':
@@ -227,7 +236,7 @@ class Controller
 				'message' => $e->getMessage(),
 			];
 			if ($firstRun){
-				$this->checkErrors()->encodeResponse(false);
+				$this->checkErrors()->encodeResponse(false, $client);
 			}
 		}
 

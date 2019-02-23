@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'url' => (string) getenv('SELF_URL'),
     'swoole' => [
         'server' => [
             'address' => (string) (getenv('SWOOLE_SERVER_ADDRESS') ?? '127.0.0.1'),

@@ -109,4 +109,8 @@ class Client
 
 		return $this->get('getMediaPreview', ['data'=>$data]);
 	}
+
+	public function getMediaInfo(object $message){
+        return $this->get('get_download_info', ['message'=>$message]);
+    }
 }

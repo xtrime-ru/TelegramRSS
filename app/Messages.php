@@ -10,11 +10,18 @@ class Messages
 	private $list;
 	private $telegramResponse;
 	private $channelUrl;
+	private $username;
+	private $client;
 
-	public function __construct($telegramResponse)
+    /**
+     * Messages constructor.
+     * @param $telegramResponse
+     * @param Client $client
+     */
+    public function __construct($telegramResponse, Client $client)
 	{
-
 		$this->telegramResponse = $telegramResponse;
+		$this->client = $client;
 		$this->parseMessages();
 	}
 
@@ -25,7 +32,8 @@ class Messages
 					'url'          => $this->getChannelUrl() . $message->id,
 					'title'        => NULL,
 					'description'  => $message->message ?? '',
-					'image'        => $message->media->photo->id ?? null,
+					'media'        => $this->getMediaInfo($message),
+					'preview'      => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
 					'timestamp'    => $message->date ?? ''
 				];
 
@@ -39,13 +47,43 @@ class Messages
 		return $this;
 	}
 
+	private function hasMedia($message){
+        if (empty($message->media)){
+            return false;
+        }
+        return true;
+    }
+
+	private function getMediaInfo($message){
+        if (!$this->hasMedia($message)){
+            return [];
+        }
+        $info = $this->client->getMediaInfo($message);
+        if (!empty($info->size) && !empty($info->mime)) {
+            return [
+                'url' => $this->getMediaUrl($message),
+                'mime' => $info->mime,
+                'size' => $info->size,
+            ];
+        }
+    }
+
+    private function getMediaUrl($message) {
+        if (!$this->hasMedia($message)){
+            return false;
+        }
+        $url = Config::getInstance()->get('url');
+
+        return "{$url}/media/{$this->username}/{$message->id}";
+    }
+
 	private function getChannelUrl(){
 		if (!$this->channelUrl) {
-			$username = $this->telegramResponse->chats[0]->username ?? '';
-			if (!$username) {
+			$this->username = $this->telegramResponse->chats[0]->username ?? '';
+			if (!$this->username) {
 				throw new \UnexpectedValueException('No channel username');
 			}
-			$this->channelUrl = static::TELEGRAM_URL . $username . '/';
+			$this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
 		}
 		return $this->channelUrl;
 	}
