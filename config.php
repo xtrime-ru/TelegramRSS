@@ -15,5 +15,8 @@ return [
     'client' => [
         'address' => (string) (getenv('TELEGRAM_CLIENT_ADDRESS') ?? '127.0.0.1'),
         'port' => (string) (getenv('TELEGRAM_CLIENT_PORT') ?? '9503'),
+    ],
+    'media' => [
+        'max_size' => (int) getenv('MAX_MEDIA_SIZE'),
     ]
 ];

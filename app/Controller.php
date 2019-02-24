@@ -34,7 +34,15 @@ class Controller
         ],
         'media'=>[
             'type'=>'media',
-            'headers' => []
+            'headers' => [],
+            'unlink' => true,
+        ],
+        'favicon.ico'=>[
+            'type' => 'favicon.ico',
+            'headers' => [
+                ['Content-Length',34494],
+                ['Content-Type','image/x-icon']
+            ],
         ]
     ];
 
@@ -62,7 +70,7 @@ class Controller
         //Parse request and generate response
 
         $this
-            ->parseRequest($request)
+            ->route($request)
             ->validate()
             ->generateResponse($client)
             ->checkErrors()
@@ -78,7 +86,10 @@ class Controller
 
         if ($this->response['file']) {
             $response->sendfile($this->response['file']);
-            unlink($this->response['file']);
+            if (!empty($this->response['unlink'])){
+                unlink($this->response['file']);
+            }
+
         } else {
             $response->end($this->response['data']);
         }
@@ -89,15 +100,20 @@ class Controller
      * @param \Swoole\Http\Request $request
      * @return Controller
      */
-    private function parseRequest(\Swoole\Http\Request $request):self {
+    private function route(\Swoole\Http\Request $request):self {
 
         $this->request['ip'] = $request->server['remote_addr'];
 
         $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
 
-        if (!is_array($path) || count($path) < 2) {
-            $this->response['type'] = 'html';
-            return $this;
+        switch(true){
+            case $path[0]==='favicon.ico':
+                $this->response['type'] = $path[0];
+                return $this;
+            case count($path) < 2:
+                $this->response['type'] = 'html';
+                return $this;
+                break;
         }
 
         if (array_key_exists($path[0], $this->responseList)) {
@@ -222,6 +238,9 @@ class Controller
                     $this->response['file'] = $this->response['data']->file;
                     $this->response['headers'] = $this->response['data']->headers;
                     $this->response['data'] = null;
+                    break;
+                case 'favicon.ico':
+                    $this->response['file'] = __DIR__ . '/../favicon.ico';
                     break;
                 default:
                     $this->response['data'] = 'Unknown response type';

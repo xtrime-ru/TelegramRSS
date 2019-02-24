@@ -96,6 +96,7 @@ class Client
         $data = array_merge([
             'channel' =>'',
             'id' => [0],
+            'size_limit' => Config::getInstance()->get('media.max_size')
         ],$data);
 
         return $this->get('getMedia', ['data'=>$data]);
