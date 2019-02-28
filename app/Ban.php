@@ -50,10 +50,16 @@ class Ban {
      */
     public function updateIp($ip):self {
 
-        $this->trimClients();
         if (empty($this->clients[$ip])){
             $this->addIp($ip);
+        } else {
+            if ($this->timeLeft($ip)){
+                //не обновляем если ip в бане
+                return $this;
+            }
         }
+
+        $this->trimClients();
         $info = &$this->clients[$ip];
 
         $info['requests'][] = time();
@@ -68,11 +74,13 @@ class Ban {
             }
         }
 
-        if ($info['ban_timestamp'] && $info['ban_timestamp'] < time()) {
+        if ($info['ban_timestamp'] < strtotime('-1 day')) {
+            //Обнуляем баны через если за последние сутки небыло банов
             $info['ban_timestamp'] = 0;
+            $info['last_ban_duration'] = 0;
         }
 
-        if ($info['ban_timestamp'] === 0 && $info['rpm'] > $this->rpmLimit) {
+        if ($info['rpm'] > $this->rpmLimit) {
             $this->addBan($ip);
         }
 
