@@ -51,6 +51,9 @@ class Messages
         if (empty($message->media)){
             return false;
         }
+        if ($message->media->{'_'} === 'messageMediaWebPage') {
+            return false;
+        }
         return true;
     }
 

@@ -18,5 +18,8 @@ return [
     ],
     'media' => [
         'max_size' => (int) getenv('MAX_MEDIA_SIZE'),
+    ],
+    'ban' => [
+        'rpm' => (int) getenv('RPM_LIMIT'),
     ]
 ];

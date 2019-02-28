@@ -40,8 +40,8 @@ class Controller
         'favicon.ico'=>[
             'type' => 'favicon.ico',
             'headers' => [
-                ['Content-Length',34494],
-                ['Content-Type','image/x-icon']
+                ['Content-Length', 34494],
+                ['Content-Type', 'image/x-icon'],
             ],
         ]
     ];
@@ -64,19 +64,18 @@ class Controller
      * @param \Swoole\Http\Response $response
      * @param Client $client
      */
-    public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client)
+    public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client, Ban $ban)
     {
 
         //Parse request and generate response
 
         $this
             ->route($request)
-            ->validate()
-            ->generateResponse($client)
+            ->validate($ban)
+            ->generateResponse($client, $ban)
             ->checkErrors()
             ->encodeResponse(true, $client)
         ;
-
 
         $response->status($this->response['code']);
 
@@ -134,7 +133,7 @@ class Controller
         return $this;
     }
 
-    private function validate(){
+    private function validate(Ban $ban = null){
 
         if (preg_match('/[^\w\-@#]/', $this->request['peer'])){
             $this->response['errors'][] = "WRONG NAME";
@@ -148,7 +147,13 @@ class Controller
             $this->response['errors'][] = "UPPERCASE NOT SUPPORTED";
         }
 
-        //TODO: search ip in blacklist.
+        if ($ban && $this->request['peer']) {
+            $timeLeft = $ban->updateIp($this->request['ip'])->timeLeft($this->request['ip']);
+            if ($timeLeft) {
+                $this->response['errors'][] = "TOO MANY REQUEST / ERRORS. TIME LEFT: {$timeLeft}";
+            }
+        }
+
         return $this;
     }
 
@@ -156,7 +161,7 @@ class Controller
      * @param Client $client
      * @return Controller
      */
-    private function generateResponse(Client $client):self {
+    private function generateResponse(Client $client, Ban $ban):self {
 
         if ($this->response['errors']) {
             return $this;
@@ -187,6 +192,10 @@ class Controller
                 'code' => $e->getCode(),
                 'message' => $e->getMessage(),
             ];
+
+            if ($ban){
+                $ban->addBan($this->request['ip']);
+            }
         }
 
         return $this;

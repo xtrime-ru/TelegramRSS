@@ -27,13 +27,15 @@ class Server
 
         $http_server->set($this->config['options']);
 
-        $http_server->on('request', function(\Swoole\Http\Request $request,  \Swoole\Http\Response $response) use($client)
+        $ban = new Ban();
+
+        $http_server->on('request', function(\Swoole\Http\Request $request,  \Swoole\Http\Response $response) use($client, $ban)
         {
             //На каждый запрос должны создаваться новые экземпляры классов парсера и коллбеков,
             //иначе их данные будут в области видимости всех запросов.
 
             //Телеграм клиент инициализируется 1 раз и используется во всех запросах.
-            new Controller($request, $response, $client);
+            new Controller($request, $response, $client, $ban);
         });
         $http_server->start();
 
