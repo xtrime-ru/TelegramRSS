@@ -67,6 +67,7 @@ class Controller
     public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client, Ban $ban)
     {
 
+        Log::getInstance()->add($request);
         //Parse request and generate response
 
         $this
@@ -212,6 +213,8 @@ class Controller
         $this->response['data'] = [
             'errors' => $this->response['errors'],
         ];
+
+        Log::getInstance()->add($this->response['data']);
 
         return $this;
     }

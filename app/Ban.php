@@ -117,7 +117,7 @@ class Ban {
         }
         $timeLeft = $status['ban_timestamp'] - time();
         if ($timeLeft > 0) {
-            return date('H:i:s', $timeLeft);
+            return gmdate('H:i:s', $timeLeft);
         }
     }
 

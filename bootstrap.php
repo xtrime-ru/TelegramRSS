@@ -12,3 +12,5 @@ if (!class_exists('TelegramRSS')) {
 if (!getenv('SWOOLE_SERVER_ADDRESS')){
     Dotenv\Dotenv::create($root, '.env')->load();
 }
+
+date_default_timezone_set(getenv('TIMEZONE','UTC'));

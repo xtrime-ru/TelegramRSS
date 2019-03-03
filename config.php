@@ -21,5 +21,10 @@ return [
     ],
     'ban' => [
         'rpm' => (int) getenv('RPM_LIMIT'),
-    ]
+    ],
+    'timezone' => (string) getenv('TIMEZONE'),
+    'log' => [
+        'dir' => (string) getenv('LOGS_DIR'),
+        'file' => (string) getenv('LOGS_FILE'),
+    ],
 ];
