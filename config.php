@@ -21,6 +21,10 @@ return [
     ],
     'ban' => [
         'rpm' => (int) getenv('RPM_LIMIT'),
+        'ip_blacklist' => array_filter(array_map(
+            'trim',
+            explode(',', getenv('IP_BLACKLIST'))
+        )),
     ],
     'timezone' => (string) getenv('TIMEZONE'),
     'log' => [

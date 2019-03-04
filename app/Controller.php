@@ -75,7 +75,7 @@ class Controller
             ->validate($ban)
             ->generateResponse($client, $ban)
             ->checkErrors()
-            ->encodeResponse(true, $client)
+            ->encodeResponse($client)
         ;
 
         $response->status($this->response['code']);
@@ -105,19 +105,21 @@ class Controller
         $this->request['ip'] = $request->server['remote_addr'];
 
         $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
+        $type = $path[0] ?? '';
 
-        switch(true){
-            case $path[0]==='favicon.ico':
-                $this->response['type'] = $path[0];
+        switch(true) {
+            case $type === 'favicon.ico':
+                $this->response['type'] = $type;
                 return $this;
+                break;
             case count($path) < 2:
                 $this->response['type'] = 'html';
                 return $this;
                 break;
         }
 
-        if (array_key_exists($path[0], $this->responseList)) {
-            $this->response['type'] = $this->responseList[$path[0]]['type'];
+        if (array_key_exists($type, $this->responseList)) {
+            $this->response['type'] = $this->responseList[$type]['type'];
             $this->request['peer'] = urldecode($path[1]);
         } else {
             $this->response['errors'][] = 'Unknown response format';
@@ -151,7 +153,7 @@ class Controller
         if ($ban && $this->request['peer']) {
             $timeLeft = $ban->updateIp($this->request['ip'])->timeLeft($this->request['ip']);
             if ($timeLeft) {
-                $this->response['errors'][] = "TOO MANY REQUEST / ERRORS. TIME LEFT: {$timeLeft}";
+                $this->response['errors'][] = "TOO MANY REQUEST / ERRORS. TIME TO UNLOCK ACCESS: {$timeLeft}";
             }
         }
 
@@ -222,11 +224,11 @@ class Controller
     /**
      * Кодирует ответ в нужный формат: json
      *
-     * @param bool $firstRun
      * @param Client $client
+     * @param bool $firstRun
      * @return Controller
      */
-    public function encodeResponse($firstRun = true, Client $client): self
+    public function encodeResponse(Client $client, $firstRun = true): self
     {
         try{
             switch ($this->response['type']) {
@@ -267,7 +269,7 @@ class Controller
                 'message' => $e->getMessage(),
             ];
             if ($firstRun){
-                $this->checkErrors()->encodeResponse(false, $client);
+                $this->checkErrors()->encodeResponse($client, false);
             }
         }
 

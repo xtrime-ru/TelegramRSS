@@ -8,6 +8,7 @@ class Ban {
     private $clients;
     private $clientsCount = 0;
     private $rpmLimit;
+    private $ipBlacklist;
     private const BAN_DURATION_STEPS = [
         1*60,
         5*60,
@@ -25,6 +26,7 @@ class Ban {
     public function __construct() {
         $this->clients = [];
         $this->rpmLimit = Config::getInstance()->get('ban.rpm');
+        $this->ipBlacklist = array_fill_keys(Config::getInstance()->get('ban.ip_blacklist'), null);
     }
 
     /**
@@ -115,10 +117,14 @@ class Ban {
         if (!$status) {
             return null;
         }
+        if (array_key_exists($ip, $this->ipBlacklist)) {
+            return '9999:00:00';
+        }
         $timeLeft = $status['ban_timestamp'] - time();
         if ($timeLeft > 0) {
             return gmdate('H:i:s', $timeLeft);
         }
+        return null;
     }
 
     private function trimClients():self {
