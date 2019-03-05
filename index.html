@@ -3,14 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <title>Telegram RSS & JSON Server</title>
+    <link rel="stylesheet" href="https://unpkg.com/terminal.css@0.6.6/dist/terminal.min.css" />
+    <style>
+        :root {
+            --global-font-size: 16px;
+            --global-line-height: 1.4em;
+            --global-space: 10px;
+            --font-stack: Menlo, Monaco, Lucida Console, Liberation Mono,
+            DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace,
+            serif;
+            --mono-font-stack: Menlo, Monaco, Lucida Console, Liberation Mono,
+            DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace,
+            serif;
+            --background-color: #222225;
+            --page-width: 60em;
+            --font-color: #e8e9ed;
+            --invert-font-color: #222225;
+            --secondary-color: #a3abba;
+            --tertiary-color: #a3abba;
+            --primary-color: #62c4ff;
+            --error-color: #ff3c74;
+            --warning-color: #ff7d3c;
+            --progress-bar-background: #3f3f44;
+            --progress-bar-fill: #62c4ff;
+            --code-bg-color: #3f3f44;
+            --input-style: solid;
+            --display-h1-decoration: block;
+        }
+        .terminal > .container:first-child{
+            max-width: 768px;
+            margin:150px auto;
+        }
+        .terminal h1{
+            color:var(--warning-color);
+        }
+    </style>
 </head>
-<body>
-<h2>Hello!</h2>
-<p>This is my telegram rss & json server. It can return 10 last posts from any public Telegram channel</p>
-<h2>Contacts</h2>
-<ul>
-    <li>Telegram: <a href="tg://resolve?domain=xtrime" target="_blank">@xtrime</a></li>
-    <li>Email: alexander(at)i-c-a.su</li>
-</ul>
+<body class="terminal">
+<div class="container">
+    <h1>Hello!</h1>
+    <p>This is my telegram rss & json server. It can return 10 last posts from any public Telegram channel as RSS or JSON.</p>
+    <h1>Features</h1>
+    <ul>
+        <li>Fast async swoole server;</li>
+        <li>Get any public telegram posts from groups as json or RSS;</li>
+        <li>Full media support. Access any media from messages via direct links.</li>
+    </ul>
+    <h1>Examples</h1>
+    <ul>
+        <li>JSON: <a href="https://tg.i-c-a.su/json/breakingmash" target="_blank">https://tg.i-c-a.su/json/breakingmash</a>;</li>
+        <li>RSS: <a href="https://tg.i-c-a.su/rss/breakingmash" target="_blank">https://tg.i-c-a.su/rss/breakingmash</a>;</li>
+        <li>Media preview: <a href="https://tg.i-c-a.su/media/breakingmash/10738/preview" target="_blank">https://tg.i-c-a.su/media/breakingmash/10738/preview</a>;</li>
+        <li>Media full: <a href="https://tg.i-c-a.su/media/breakingmash/10738" target="_blank">https://tg.i-c-a.su/media/breakingmash/10738</a>.</li>
+    </ul>
+    <h1>Source Code</h1>
+    <p>This service is combination of two my micro-services:</p>
+    <ul>
+        <li>TelegramSwooleClient: <a href="https://github.com/xtrime-ru/TelegramSwooleClient" target="_blank">https://github.com/xtrime-ru/TelegramSwooleClient</a>;</li>
+        <li>TelegramRSS: <a href="https://github.com/xtrime-ru/TelegramRSS" target="_blank">https://github.com/xtrime-ru/TelegramRSS</a>.</li>
+    </ul>
+    <h1>Limits and restrictions</h1>
+    <ul>
+        <li>Only public channels;</li>
+        <li>RPM Limit: 15 requests per minute;</li>
+        <li>Temporary ban on any error, for example: invalid channel name or private channel.</li>
+    </ul>
+    <h1>Contacts</h1>
+    <ul>
+        <li>Telegram: <a href="tg://resolve?domain=xtrime" target="_blank">@xtrime</a></li>
+        <li>Email: alexander(at)i-c-a.su</li>
+    </ul>
+</div>
 </body>
 </html>
