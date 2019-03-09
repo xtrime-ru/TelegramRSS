@@ -7,6 +7,9 @@ use \Curl\Curl;
 class Client
 {
     private $config;
+    private const RETRY = 5;
+    private const RETRY_INTERVAL = 2;
+    private const RETRY_MESSAGE = 'Fatal error. Restarting.';
 
     private $curl;
 
@@ -43,31 +46,41 @@ class Client
     /**
      * @param $method
      * @param array $parameters
+     * @param int $retry
      * @return object
      * @throws \Exception
      */
-    private function get($method, $parameters = []){
+    private function get($method, $parameters = [], $retry = 0){
+        if ($retry){
+            //Делаем попытку реконекта
+            sleep(static::RETRY_INTERVAL);
+            echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
+            Log::getInstance()->add('Client crashed and restarting. Resending request.');
+        }
         $address = "{$this->config['address']}:{$this->config['port']}";
         $address .= "/api/$method";
         $this->curl->get($address, $parameters);
 
         if ($this->curl->error) {
-            if (!empty($this->curl->response->errors[0]->message)){
-                $message = 'Telegram client error: ' . $this->curl->response->errors[0]->message;
+            $message = $this->curl->response->errors[0]->message ?? '';
+            if ((!$message || $message === static::RETRY_MESSAGE) && $retry < static::RETRY) {
+                return $this->get($method, $parameters, ++$retry);
+            }
+            if ($message){
                 throw new \UnexpectedValueException($message, $this->curl->response->errors[0]->code ?? 400);
-            } else {
-                throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
             }
-        } else {
-            /** @var \stdClass $result */
-            $result = $this->curl->response;
-            if (!empty($result->response)) {
-                $result = $result->response;
-            } else {
-                throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
-            }
-            return $result;
+            throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
         }
+
+        /** @var \stdClass $result */
+        $result = $this->curl->response;
+        if (!empty($result->response)) {
+            $result = $result->response;
+        } else {
+            throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
+        }
+        return $result;
+
     }
 
     public function getHistory($data) {
