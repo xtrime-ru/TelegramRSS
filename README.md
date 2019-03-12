@@ -31,10 +31,10 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     numprocs=1
     directory=/home/admin/web/tg.i-c-a.su/TelegramRSS/
     autostart=true
+    autostart=true
     autorestart=true
-    nodaemon=true
-    logfile=/dev/null
-    logfile_maxbytes=0
+    stdout_logfile=none
+    redirect_stderr=true
      ```
   
  **Usage**
