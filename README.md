@@ -50,3 +50,8 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     * https://tg.i-c-a.su/media/breakingmash/10738
     
     Default address of rss server is http://127.0.0.1:9504/
+    
+ **Contacts**
+
+ * Telegram: [@xtrime](tg://resolve?domain=xtrime)
+ * Email: alexander(at)i-c-a.su
