@@ -66,7 +66,6 @@ class Controller
      */
     public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client, Ban $ban)
     {
-
         Log::getInstance()->add($request);
         //Parse request and generate response
 
@@ -101,8 +100,8 @@ class Controller
      * @return Controller
      */
     private function route(\Swoole\Http\Request $request):self {
-
-        $this->request['ip'] = $request->server['remote_addr'];
+        //nginx proxy pass ?? custom header ?? default value
+        $this->request['ip'] = $request->header['x-real-ip'] ?? $request->header['remote_addr'] ?? $request->server['remote_addr'];
 
         $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
         $type = $path[0] ?? '';
