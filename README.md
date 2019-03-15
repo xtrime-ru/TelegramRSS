@@ -46,6 +46,10 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     
     * https://tg.i-c-a.su/json/breakingmash
     * https://tg.i-c-a.su/rss/breakingmash
+    * Custom limit: https://tg.i-c-a.su/rss/breakingmash?limit=50 
+      
+      Maximum - 100 posts
+    * Pagination: https://tg.i-c-a.su/rss/breakingmash/2
     * https://tg.i-c-a.su/media/breakingmash/10738/preview
     * https://tg.i-c-a.su/media/breakingmash/10738
     

@@ -88,7 +88,6 @@ class Client
             'peer' =>'',
             'limit' => 10,
         ],$data);
-
         return $this->get('getHistory', ['data'=>$data]);
     }
 

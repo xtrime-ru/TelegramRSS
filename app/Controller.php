@@ -4,13 +4,16 @@ namespace TelegramRSS;
 
 class Controller
 {
+    private const POSTS_MAX_LIMIT = 100;
+
     /** @var array */
     private $request = [
         'ip' => '',
         'peer' => '',
         'limit' => 10,
-        'message'=>0,
-        'preview'=>false,
+        'page' => 1,
+        'message' => 0,
+        'preview' => false,
     ];
 
     private $responseList = [
@@ -120,6 +123,9 @@ class Controller
         if (array_key_exists($type, $this->responseList)) {
             $this->response['type'] = $this->responseList[$type]['type'];
             $this->request['peer'] = urldecode($path[1]);
+            $this->request['page'] = (int) ($path[2] ?? $this->request['page']);
+            $this->request['limit'] = (int) ($request->get['limit'] ?? $this->request['limit']) ?: $this->request['limit'];
+            $this->request['limit'] = min($this->request['limit'], static::POSTS_MAX_LIMIT);
         } else {
             $this->response['errors'][] = 'Unknown response format';
         }
@@ -183,7 +189,11 @@ class Controller
                     $this->response['data'] = $client->getMedia($data);
                 }
             } elseif ($this->request['peer']) {
-                $this->response['data'] = $client->getHistory(['peer' => $this->request['peer']]);
+                $this->response['data'] = $client->getHistory([
+                    'peer' => $this->request['peer'],
+                    'limit' => $this->request['limit'],
+                    'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
+                ]);
                 if ($this->response['data']->_ !== 'messages.channelMessages') {
                     throw new \UnexpectedValueException('This is not a channel');
                 }
