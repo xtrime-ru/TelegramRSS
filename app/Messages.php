@@ -7,7 +7,7 @@ class Messages
 {
     private const TELEGRAM_URL = 'https://t.me/';
 
-    private $list;
+    private $list = [];
     private $telegramResponse;
     private $channelUrl;
     private $username;
@@ -91,7 +91,10 @@ class Messages
         return $this->channelUrl;
     }
 
-    public function get(){
+    /**
+     * @return array
+     */
+    public function get():array {
         return $this->list;
     }
 
