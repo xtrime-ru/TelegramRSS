@@ -2,16 +2,16 @@
     "name": "xtrime-ru/telegramrss",
     "description": "Fast, simple, async PHP Telegram RSS & JSON server",
     "type": "project",
-    "homepage": "http://tg.i-c-a.su/",
+    "homepage": "https://tg.i-c-a.su/",
     "license": "MIT",
     "keywords": ["telegram", "mtproto", "protocol", "client", "PHP", "swoole", "async", "daemon", "coroutine", "parser", "micro-service", "RSS"],
     "require": {
         "php": ">=7.2.0",
-        "vlucas/phpdotenv": "^3.0",
+        "vlucas/phpdotenv": "^3.3",
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
-        "ext-swoole": ">=4.0",
+        "ext-swoole": ">=4.1",
         "php-curl-class/php-curl-class": "dev-master"
     },
     "require-dev": {

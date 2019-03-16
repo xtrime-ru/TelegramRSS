@@ -84,7 +84,9 @@ class Log {
         if (!$this->needLog){
             return $this;
         }
-        file_put_contents("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND|LOCK_EX);
+        go(function () use($text) {
+            file_put_contents("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND|LOCK_EX);
+        });
         return $this;
     }
 

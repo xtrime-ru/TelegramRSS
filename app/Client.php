@@ -6,7 +6,6 @@ use \Curl\Curl;
 
 class Client
 {
-    private $config;
     private const RETRY = 5;
     private const RETRY_INTERVAL = 2;
     private const RETRY_MESSAGE = 'Fatal error. Restarting.';
@@ -23,23 +22,28 @@ class Client
     {
 
         $config = Config::getInstance()->get('client');
-        $this->config = [
+        $config = [
             'address'=> $address ?: $config['address'],
             'port'=> $port ?: $config['port'],
         ];
 
-        $this->curl = new Curl();
+        $this->curl = new Curl("{$config['address']}:{$config['port']}");
 
-        echo PHP_EOL . 'Checking telegram client ...' . PHP_EOL;
-        $time = microtime(true);
-        try {
-            echo 'username: ' . $this->get_self()->username . PHP_EOL;
-        } catch (\Exception $e){
-            echo "Check failed: Code: {$e->getCode()}. {$e->getMessage()}" . PHP_EOL;
-        }
+        $process = new \Swoole\Process(function (\Swoole\Process $process) {
+            echo PHP_EOL . 'Checking telegram client ...' . PHP_EOL;
+            $time = microtime(true);
+            try{
+                echo 'username: ' . ($this->get_self()->username ?? '-') . PHP_EOL;
+            } catch (\Exception $e){
+                echo "Check failed: Code: {$e->getCode()}. {$e->getMessage()}" . PHP_EOL;
+            }
 
-        $time = round(microtime(true) - $time, 3);
-        echo PHP_EOL . "Client started: $time sec" . PHP_EOL;
+            $time = round(microtime(true) - $time, 3);
+            echo PHP_EOL . "Client started: $time sec" . PHP_EOL;
+            $process->exit();
+        });
+
+        $process->start();
 
     }
 
@@ -57,9 +61,8 @@ class Client
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Log::getInstance()->add('Client crashed and restarting. Resending request.');
         }
-        $address = "{$this->config['address']}:{$this->config['port']}";
-        $address .= "/api/$method";
-        $this->curl->get($address, $parameters);
+
+        $this->curl->get("/api/$method", $parameters);
 
         if ($this->curl->error) {
             $message = $this->curl->response->errors[0]->message ?? '';

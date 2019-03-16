@@ -66,6 +66,7 @@ class Controller
      * @param \Swoole\Http\Request $request
      * @param \Swoole\Http\Response $response
      * @param Client $client
+     * @param Ban $ban
      */
     public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client, Ban $ban)
     {
@@ -272,7 +273,7 @@ class Controller
             if (!$this->response['headers']) {
                 $this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
             }
-        } catch (\Exception $e){
+        } catch (\Throwable $e) {
             $this->response['errors'][] = [
                 'code' => $e->getCode(),
                 'message' => $e->getMessage(),
