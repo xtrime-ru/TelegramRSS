@@ -7,7 +7,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $shortopts = 's::p::c::o';
-$longopts  = [
+$longopts = [
     'server_address::', // ip адрес сервера, необязательное значение
     'server_port::',  // порт сервера, необязательное значение
     'client_address::',  // ip телеграм-клиента, необязательное значение
@@ -16,11 +16,11 @@ $longopts  = [
 ];
 $options = getopt($shortopts, $longopts);
 $options = [
-    'server_address'     => $options['server_address'] ?? $options['s'] ?? '',
-    'server_port'       => $options['port'] ?? $options['p'] ?? '',
-    'client_address'    => $options['client_address'] ?? $options['c'] ?? '',
-    'client_port'       => $options['port'] ?? $options['o'] ?? '',
-    'help'              => isset($options['help']),
+    'server_address' => $options['server_address'] ?? $options['s'] ?? '',
+    'server_port' => $options['port'] ?? $options['p'] ?? '',
+    'client_address' => $options['client_address'] ?? $options['c'] ?? '',
+    'client_port' => $options['port'] ?? $options['o'] ?? '',
+    'help' => isset($options['help']),
 ];
 
 if ($options['help']) {
@@ -49,5 +49,5 @@ Example:
     exit;
 }
 
-$client = new \TelegramRSS\Client($options['client_address'],$options['client_port']);
+$client = new \TelegramRSS\Client($options['client_address'], $options['client_port']);
 new \TelegramRSS\Server($client, $options['server_address'], $options['server_port']);

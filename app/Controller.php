@@ -2,8 +2,7 @@
 
 namespace TelegramRSS;
 
-class Controller
-{
+class Controller {
     private const POSTS_MAX_LIMIT = 100;
 
     /** @var array */
@@ -17,43 +16,43 @@ class Controller
     ];
 
     private $responseList = [
-        'html'=> [
-            'type'=> 'html',
+        'html' => [
+            'type' => 'html',
             'headers' => [
                 ['Content-Type', 'text/html;charset=utf-8'],
             ],
         ],
-        'rss'=>[
-            'type'=> 'rss',
+        'rss' => [
+            'type' => 'rss',
             'headers' => [
                 ['Content-Type', 'application/rss+xml;charset=utf-8'],
             ],
         ],
-        'json'=>[
-            'type'=> 'json',
+        'json' => [
+            'type' => 'json',
             'headers' => [
                 ['Content-Type', 'application/json;charset=utf-8'],
             ],
         ],
-        'media'=>[
-            'type'=>'media',
+        'media' => [
+            'type' => 'media',
             'headers' => [],
             'unlink' => true,
         ],
-        'favicon.ico'=>[
+        'favicon.ico' => [
             'type' => 'favicon.ico',
             'headers' => [
                 ['Content-Length', 34494],
                 ['Content-Type', 'image/x-icon'],
             ],
-        ]
+        ],
     ];
 
     /** @var array */
     private $response = [
         'errors' => [],
         'type' => '',
-        'headers'=>[],
+        'headers' => [],
         'code' => 200,
         'data' => null,
         'file' => null,
@@ -68,8 +67,12 @@ class Controller
      * @param Client $client
      * @param Ban $ban
      */
-    public function __construct(\Swoole\Http\Request $request, \Swoole\Http\Response $response, Client $client, Ban $ban)
-    {
+    public function __construct(
+        \Swoole\Http\Request $request,
+        \Swoole\Http\Response $response,
+        Client $client,
+        Ban $ban
+    ) {
         Log::getInstance()->add($request);
         //Parse request and generate response
 
@@ -89,7 +92,7 @@ class Controller
 
         if ($this->response['file']) {
             $response->sendfile($this->response['file']);
-            if (!empty($this->response['unlink'])){
+            if (!empty($this->response['unlink'])) {
                 unlink($this->response['file']);
             }
 
@@ -103,14 +106,14 @@ class Controller
      * @param \Swoole\Http\Request $request
      * @return Controller
      */
-    private function route(\Swoole\Http\Request $request):self {
+    private function route(\Swoole\Http\Request $request): self {
         //nginx proxy pass ?? custom header ?? default value
         $this->request['ip'] = $request->header['x-real-ip'] ?? $request->header['remote_addr'] ?? $request->server['remote_addr'];
 
-        $path = array_values(array_filter(explode('/',  $request->server['request_uri'])));
+        $path = array_values(array_filter(explode('/', $request->server['request_uri'])));
         $type = $path[0] ?? '';
 
-        switch(true) {
+        switch (true) {
             case $type === 'favicon.ico':
                 $this->response['type'] = $type;
                 return $this;
@@ -124,15 +127,15 @@ class Controller
         if (array_key_exists($type, $this->responseList)) {
             $this->response['type'] = $this->responseList[$type]['type'];
             $this->request['peer'] = urldecode($path[1]);
-            $this->request['page'] = (int) ($path[2] ?? $this->request['page']);
-            $this->request['limit'] = (int) ($request->get['limit'] ?? $this->request['limit']) ?: $this->request['limit'];
+            $this->request['page'] = (int)($path[2] ?? $this->request['page']);
+            $this->request['limit'] = (int)($request->get['limit'] ?? $this->request['limit']) ?: $this->request['limit'];
             $this->request['limit'] = min($this->request['limit'], static::POSTS_MAX_LIMIT);
         } else {
             $this->response['errors'][] = 'Unknown response format';
         }
 
         if ($this->response['type'] === 'media') {
-            $this->request['message'] = (int) ($path[2] ?? 0);
+            $this->request['message'] = (int)($path[2] ?? 0);
             if (!$this->request['message']) {
                 $this->response['errors'][] = 'Unknown message id';
             }
@@ -142,13 +145,13 @@ class Controller
         return $this;
     }
 
-    private function validate(Ban $ban = null){
+    private function validate(Ban $ban = null) {
 
-        if (preg_match('/[^\w\-@#]/', $this->request['peer'])){
+        if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
             $this->response['errors'][] = "WRONG NAME";
         }
 
-        if (preg_match('/bot$/i', $this->request['peer'])){
+        if (preg_match('/bot$/i', $this->request['peer'])) {
             $this->response['errors'][] = "BOTS NOT ALLOWED";
         }
 
@@ -170,7 +173,7 @@ class Controller
      * @param Client $client
      * @return Controller
      */
-    private function generateResponse(Client $client, Ban $ban):self {
+    private function generateResponse(Client $client, Ban $ban): self {
 
         if ($this->response['errors']) {
             return $this;
@@ -184,17 +187,19 @@ class Controller
                         $this->request['message'],
                     ],
                 ];
-                if ($this->request['preview']){
+                if ($this->request['preview']) {
                     $this->response['data'] = $client->getMediaPreview($data);
                 } else {
                     $this->response['data'] = $client->getMedia($data);
                 }
             } elseif ($this->request['peer']) {
-                $this->response['data'] = $client->getHistory([
-                    'peer' => $this->request['peer'],
-                    'limit' => $this->request['limit'],
-                    'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
-                ]);
+                $this->response['data'] = $client->getHistory(
+                    [
+                        'peer' => $this->request['peer'],
+                        'limit' => $this->request['limit'],
+                        'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
+                    ]
+                );
                 if ($this->response['data']->_ !== 'messages.channelMessages') {
                     throw new \UnexpectedValueException('This is not a channel');
                 }
@@ -206,7 +211,7 @@ class Controller
                 'message' => $e->getMessage(),
             ];
 
-            if ($ban){
+            if ($ban) {
                 $ban->addBan($this->request['ip']);
             }
         }
@@ -214,7 +219,7 @@ class Controller
         return $this;
     }
 
-    private function checkErrors():self {
+    private function checkErrors(): self {
 
         if (!$this->response['errors']) {
             return $this;
@@ -238,9 +243,8 @@ class Controller
      * @param bool $firstRun
      * @return Controller
      */
-    public function encodeResponse(Client $client, $firstRun = true): self
-    {
-        try{
+    public function encodeResponse(Client $client, $firstRun = true): self {
+        try {
             switch ($this->response['type']) {
                 case 'html':
                     $this->response['data'] = file_get_contents($this->indexPage);
@@ -278,7 +282,7 @@ class Controller
                 'code' => $e->getCode(),
                 'message' => $e->getMessage(),
             ];
-            if ($firstRun){
+            if ($firstRun) {
                 $this->checkErrors()->encodeResponse($client, false);
             }
         }

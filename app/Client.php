@@ -2,8 +2,7 @@
 
 namespace TelegramRSS;
 
-class Client
-{
+class Client {
     private const RETRY = 5;
     private const RETRY_INTERVAL = 2;
     private const RETRY_MESSAGE = 'Fatal error. Restarting.';
@@ -14,13 +13,12 @@ class Client
      * @param string $port
      * @throws \ErrorException
      */
-    public function __construct(string $address = '', string $port = '')
-    {
+    public function __construct(string $address = '', string $port = '') {
 
         $this->config = Config::getInstance()->get('client');
         $this->config = [
-            'address'=> $address ?: $this->config['address'],
-            'port'=> $port ?: $this->config['port'],
+            'address' => $address ?: $this->config['address'],
+            'port' => $port ?: $this->config['port'],
         ];
 
     }
@@ -33,7 +31,7 @@ class Client
      * @throws \Exception
      */
     private function get($method, $parameters = [], $retry = 0) {
-        if ($retry){
+        if ($retry) {
             //Делаем попытку реконекта
             sleep(static::RETRY_INTERVAL);
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
@@ -51,7 +49,7 @@ class Client
             if ((!$message || $message === static::RETRY_MESSAGE) && $retry < static::RETRY) {
                 return $this->get($method, $parameters, ++$retry);
             }
-            if ($message){
+            if ($message) {
                 throw new \UnexpectedValueException($message, $body->errors[0]->code ?? 400);
             }
             throw new \UnexpectedValueException('Telegram client connection error', $curl->errCode);
@@ -67,46 +65,58 @@ class Client
     }
 
     public function getHistory($data) {
-        $data = array_merge([
-            'peer' =>'',
-            'limit' => 10,
-        ],$data);
-        return $this->get('getHistory', ['data'=>$data]);
+        $data = array_merge(
+            [
+                'peer' => '',
+                'limit' => 10,
+            ],
+            $data
+        );
+        return $this->get('getHistory', ['data' => $data]);
     }
 
     public function get_self() {
         return $this->get('get_self');
     }
 
-    public function getMessage($data){
-        $data = array_merge([
-            'channel' =>'',
-            'id' => [0],
-        ],$data);
+    public function getMessage($data) {
+        $data = array_merge(
+            [
+                'channel' => '',
+                'id' => [0],
+            ],
+            $data
+        );
 
-        return $this->get('channels.getMessages', ['data'=>$data]);
+        return $this->get('channels.getMessages', ['data' => $data]);
     }
 
-    public function getMedia($data){
-        $data = array_merge([
-            'channel' =>'',
-            'id' => [0],
-            'size_limit' => Config::getInstance()->get('media.max_size')
-        ],$data);
+    public function getMedia($data) {
+        $data = array_merge(
+            [
+                'channel' => '',
+                'id' => [0],
+                'size_limit' => Config::getInstance()->get('media.max_size'),
+            ],
+            $data
+        );
 
-        return $this->get('getMedia', ['data'=>$data]);
+        return $this->get('getMedia', ['data' => $data]);
     }
 
-    public function getMediaPreview($data){
-        $data = array_merge([
-            'channel' =>'',
-            'id' => [0],
-        ],$data);
+    public function getMediaPreview($data) {
+        $data = array_merge(
+            [
+                'channel' => '',
+                'id' => [0],
+            ],
+            $data
+        );
 
-        return $this->get('getMediaPreview', ['data'=>$data]);
+        return $this->get('getMediaPreview', ['data' => $data]);
     }
 
-    public function getMediaInfo(object $message){
-        return $this->get('get_download_info', ['message'=>$message]);
+    public function getMediaInfo(object $message) {
+        return $this->get('get_download_info', ['message' => $message]);
     }
 }

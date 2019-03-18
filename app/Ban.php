@@ -10,17 +10,16 @@ class Ban {
     private $rpmLimit;
     private $ipBlacklist;
     private const BAN_DURATION_STEPS = [
-        1*60,
-        5*60,
-        30*60,
-        60*60,
-        6*60*60,
-        12*60*60,
-        24*60*60,
+        1 * 60,
+        5 * 60,
+        30 * 60,
+        60 * 60,
+        6 * 60 * 60,
+        12 * 60 * 60,
+        24 * 60 * 60,
     ];
     private const CLIENTS_LIMIT = 10000;
     private const CLIENTS_TRIM_THRESHOLD = 8000;
-
 
 
     public function __construct() {
@@ -38,7 +37,7 @@ class Ban {
         $this->clients[$ip] = [
             'requests' => [],
             'rpm' => 0,
-            'last_ban_duration'=>0,
+            'last_ban_duration' => 0,
             'ban_timestamp' => 0,
         ];
         ++$this->clientsCount;
@@ -50,12 +49,12 @@ class Ban {
      * @param $ip
      * @return Ban
      */
-    public function updateIp($ip):self {
+    public function updateIp($ip): self {
 
-        if (empty($this->clients[$ip])){
+        if (empty($this->clients[$ip])) {
             $this->addIp($ip);
         } else {
-            if ($this->timeLeft($ip)){
+            if ($this->timeLeft($ip)) {
                 //не обновляем если ip в бане
                 return $this;
             }
@@ -94,10 +93,10 @@ class Ban {
      * @param $ip
      * @return Ban
      */
-    public function addBan($ip):self {
+    public function addBan($ip): self {
         $info = &$this->clients[$ip];
         foreach (static::BAN_DURATION_STEPS as $duration) {
-            if ($info['last_ban_duration'] < $duration){
+            if ($info['last_ban_duration'] < $duration) {
                 $info['last_ban_duration'] = $duration;
                 break;
             }
@@ -127,7 +126,7 @@ class Ban {
         return null;
     }
 
-    private function trimClients():self {
+    private function trimClients(): self {
         if ($this->clientsCount > static::CLIENTS_LIMIT) {
             $trimLimit = $this->clientsCount - static::CLIENTS_TRIM_THRESHOLD;
             array_splice($this->clients, 0, $trimLimit);

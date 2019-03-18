@@ -5,7 +5,7 @@ if (!class_exists('TelegramRSS')) {
     if (!file_exists($root . '/vendor/autoload.php')) {
         $root = __DIR__ . '/../../..';
     }
-    if (!file_exists($root . '/vendor/autoload.php')){
+    if (!file_exists($root . '/vendor/autoload.php')) {
         echo 'Need to run `composer install` before launch' . PHP_EOL;
         exit;
     }
@@ -17,8 +17,8 @@ if (!file_exists('.env')) {
     copy('.env.example', '.env');
 }
 //Check if root env file hash been loaded (in case plugin installed in existing project)
-if (!getenv('SWOOLE_SERVER_ADDRESS')){
+if (!getenv('SWOOLE_SERVER_ADDRESS')) {
     Dotenv\Dotenv::create($root, '.env')->load();
 }
 
-date_default_timezone_set(getenv('TIMEZONE','UTC'));
+date_default_timezone_set(getenv('TIMEZONE', 'UTC'));

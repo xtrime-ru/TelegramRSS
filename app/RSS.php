@@ -16,8 +16,7 @@ class RSS {
      * @param array $messages
      * @param string $selfLink
      */
-    public function __construct(array $messages, string $selfLink)
-    {
+    public function __construct(array $messages, string $selfLink) {
         $this->createRss($messages, $selfLink);
     }
 
@@ -26,15 +25,16 @@ class RSS {
      * @param string $selfLink
      * @return $this
      */
-    private function createRss(array $messages, string $selfLink): self
-    {
+    private function createRss(array $messages, string $selfLink): self {
         $latestDate = 0;
         foreach ($messages as $message) {
             if ($message['timestamp'] > $latestDate) $latestDate = $message['timestamp'];
         }
         $lastBuildDate = date(DATE_RSS, $latestDate);
         //Create the RSS feed
-        $xmlFeed = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"></rss>');
+        $xmlFeed = new \SimpleXMLElement(
+            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"></rss>'
+        );
 
         $xmlFeed->addChild('channel');
         //Required elements
@@ -46,7 +46,7 @@ class RSS {
 
         $atomLink = $xmlFeed->channel->addChild('atom:atom:link');
         $atomLink->addAttribute('rel', 'self');
-        $atomLink->addAttribute('type','application/rss+xml');
+        $atomLink->addAttribute('type', 'application/rss+xml');
         $atomLink->addAttribute('href', $selfLink);
 
         //Optional elements
@@ -61,7 +61,7 @@ class RSS {
             if (!empty($item['description']) || !empty($item['preview'])) {
                 $description = '';
                 if ($item['preview']) {
-                    $description .= '<img src="'.$item['preview'].'" style="max-width:100%"/>';
+                    $description .= '<img src="' . $item['preview'] . '" style="max-width:100%"/>';
                     $description .= '<br/><br/>';
                 }
                 $description .= $item['description'];
@@ -93,8 +93,7 @@ class RSS {
     /**
      * @return string
      */
-    public function get(): string
-    {
+    public function get(): string {
         return $this->rss;
     }
 }
