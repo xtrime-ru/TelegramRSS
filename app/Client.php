@@ -2,15 +2,11 @@
 
 namespace TelegramRSS;
 
-use \Curl\Curl;
-
 class Client
 {
     private const RETRY = 5;
     private const RETRY_INTERVAL = 2;
     private const RETRY_MESSAGE = 'Fatal error. Restarting.';
-
-    private $curl;
 
     /**
      * Client constructor.
@@ -21,29 +17,11 @@ class Client
     public function __construct(string $address = '', string $port = '')
     {
 
-        $config = Config::getInstance()->get('client');
-        $config = [
-            'address'=> $address ?: $config['address'],
-            'port'=> $port ?: $config['port'],
+        $this->config = Config::getInstance()->get('client');
+        $this->config = [
+            'address'=> $address ?: $this->config['address'],
+            'port'=> $port ?: $this->config['port'],
         ];
-
-        $this->curl = new Curl("{$config['address']}:{$config['port']}");
-
-        $process = new \Swoole\Process(function (\Swoole\Process $process) {
-            echo PHP_EOL . 'Checking telegram client ...' . PHP_EOL;
-            $time = microtime(true);
-            try{
-                echo 'username: ' . ($this->get_self()->username ?? '-') . PHP_EOL;
-            } catch (\Exception $e){
-                echo "Check failed: Code: {$e->getCode()}. {$e->getMessage()}" . PHP_EOL;
-            }
-
-            $time = round(microtime(true) - $time, 3);
-            echo PHP_EOL . "Client started: $time sec" . PHP_EOL;
-            $process->exit();
-        });
-
-        $process->start();
 
     }
 
@@ -54,7 +32,7 @@ class Client
      * @return object
      * @throws \Exception
      */
-    private function get($method, $parameters = [], $retry = 0){
+    private function get($method, $parameters = [], $retry = 0) {
         if ($retry){
             //Делаем попытку реконекта
             sleep(static::RETRY_INTERVAL);
@@ -62,25 +40,27 @@ class Client
             Log::getInstance()->add('Client crashed and restarting. Resending request.');
         }
 
-        $this->curl->get("/api/$method", $parameters);
+        $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
+        $curl->post("/api/$method", $parameters);
+        $curl->recv(10);
 
-        if ($this->curl->error) {
-            $message = $this->curl->response->errors[0]->message ?? '';
+        $body = json_decode($curl->body);
+        if ($curl->errCode) {
+
+            $message = $body->errors[0]->message ?? '';
             if ((!$message || $message === static::RETRY_MESSAGE) && $retry < static::RETRY) {
                 return $this->get($method, $parameters, ++$retry);
             }
             if ($message){
-                throw new \UnexpectedValueException($message, $this->curl->response->errors[0]->code ?? 400);
+                throw new \UnexpectedValueException($message, $body->errors[0]->code ?? 400);
             }
-            throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
+            throw new \UnexpectedValueException('Telegram client connection error', $curl->errCode);
         }
 
-        /** @var \stdClass $result */
-        $result = $this->curl->response;
-        if (!empty($result->response)) {
-            $result = $result->response;
+        if (!empty($body->response)) {
+            $result = $body->response;
         } else {
-            throw new \UnexpectedValueException('Telegram client connection error', $this->curl->errorCode);
+            throw new \UnexpectedValueException('Telegram client connection error', $curl->errCode);
         }
         return $result;
 

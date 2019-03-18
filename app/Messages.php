@@ -26,23 +26,36 @@ class Messages
     }
 
     private function parseMessages():self {
-        if (!empty($this->telegramResponse->messages)){
-            foreach ($this->telegramResponse->messages as $message) {
-                $parsedMessage = [
-                    'url'          => $this->getChannelUrl() . $message->id,
-                    'title'        => NULL,
-                    'description'  => $message->message ?? '',
-                    'media'        => $this->getMediaInfo($message),
-                    'preview'      => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
-                    'timestamp'    => $message->date ?? ''
-                ];
+        if ($messages = $this->telegramResponse->messages ?? []){
+            $size = count($messages);
+            $chan = new \Co\Channel($size);
+            foreach ($messages as $message) {
+                go(function () use($chan, $message) {
+                    $parsedMessage = [
+                        'url'          => $this->getChannelUrl() . $message->id,
+                        'title'        => NULL,
+                        'description'  => $message->message ?? '',
+                        'media'        => $this->getMediaInfo($message),
+                        'preview'      => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
+                        'timestamp'    => $message->date ?? ''
+                    ];
 
-                $mime = $message->media->document->mime_type ?? '';
-                if (strpos($mime,'video')!==false) {
-                    $parsedMessage['title'] = '[Видео]';
-                }
-                $this->list[$message->id] = $parsedMessage;
+                    $mime = $message->media->document->mime_type ?? '';
+                    if (strpos($mime,'video')!==false) {
+                        $parsedMessage['title'] = '[Видео]';
+                    }
+                    $chan->push([$message->id=>$parsedMessage]);
+                });
             }
+
+            for ($i = 0; $i < $size; $i++)
+            {
+                $element = $chan->pop();
+                $key = array_key_first($element);
+                $this->list[$key] = $element[$key];
+            }
+            krsort($this->list);
+
         }
         return $this;
     }

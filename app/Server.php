@@ -22,7 +22,7 @@ class Server
         $http_server = new \swoole_http_server(
             $this->config['server']['address'],
             $this->config['server']['port'],
-            SWOOLE_BASE
+            SWOOLE_BASE //single process
         );
 
         $http_server->set($this->config['options']);
@@ -37,8 +37,8 @@ class Server
             //Телеграм клиент инициализируется 1 раз и используется во всех запросах.
             new Controller($request, $response, $client, $ban);
         });
+        echo 'Server started' . PHP_EOL;
         $http_server->start();
-
     }
 
     /**

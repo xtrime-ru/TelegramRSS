@@ -11,8 +11,7 @@
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
-        "ext-swoole": ">=4.1",
-        "php-curl-class/php-curl-class": "dev-master"
+        "ext-swoole": ">=4.1"
     },
     "require-dev": {
         "swoole/ide-helper": "dev-master"
