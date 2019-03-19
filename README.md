@@ -31,10 +31,35 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     numprocs=1
     directory=/home/admin/web/tg.i-c-a.su/TelegramRSS/
     autostart=true
-    autostart=true
     autorestart=true
     stdout_logfile=none
     redirect_stderr=true
+     ```
+ 1. Nginx config     
+    ```
+    server {
+        listen      %ip%:443 ssl;
+        server_name tg.i-c-a.su www.tg.i-c-a.su;
+    
+        ssl_certificate      /home/admin/conf/web/ssl.tg.i-c-a.su.pem;
+        ssl_certificate_key  /home/admin/conf/web/ssl.tg.i-c-a.su.key;
+    
+        location / {
+            proxy_set_header Host $http_host;
+            proxy_set_header SERVER_PORT $server_port;
+            proxy_set_header REMOTE_ADDR $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Upgrade $http_upgrade;
+    
+            fastcgi_param REMOTE_ADDR $http_x_real_ip;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "keep-alive";
+    
+            proxy_pass http://127.0.0.1:9504;
+        }
+    
+    }
+
      ```
   
  **Usage**
