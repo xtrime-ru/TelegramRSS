@@ -45,6 +45,7 @@ class Controller {
                 ['Content-Length', 34494],
                 ['Content-Type', 'image/x-icon'],
             ],
+            'unlink' => false,
         ],
     ];
 
@@ -92,7 +93,7 @@ class Controller {
 
         if ($this->response['file']) {
             $response->sendfile($this->response['file']);
-            if (!empty($this->response['unlink'])) {
+            if ($this->response['unlink']) {
                 unlink($this->response['file']);
             }
 
@@ -266,9 +267,11 @@ class Controller {
                     $this->response['file'] = $this->response['data']->file;
                     $this->response['headers'] = $this->response['data']->headers;
                     $this->response['data'] = null;
+                    $this->response['unlink'] = $this->responseList['media']['unlink'];
                     break;
                 case 'favicon.ico':
                     $this->response['file'] = __DIR__ . '/../favicon.ico';
+                    $this->response['unlink'] = $this->responseList['favicon.ico']['unlink'];
                     break;
                 default:
                     $this->response['data'] = 'Unknown response type';
