@@ -24,8 +24,12 @@ class Ban {
 
     public function __construct() {
         $this->clients = [];
-        $this->rpmLimit = Config::getInstance()->get('ban.rpm');
-        $this->ipBlacklist = array_fill_keys(Config::getInstance()->get('ban.ip_blacklist'), null);
+        $this->rpmLimit = Config::getInstance()->get('access.rpm');
+        $this->ipBlacklist = array_fill_keys(Config::getInstance()->get('access.ip_blacklist'), null);
+    }
+
+    private function disableBan() {
+        return (bool)$this->rpmLimit === 0;
     }
 
     /**
@@ -34,6 +38,8 @@ class Ban {
      * @return Ban
      */
     private function addIp($ip): self {
+        if ($this->disableBan()) return $this;
+
         $this->clients[$ip] = [
             'requests' => [],
             'rpm' => 0,
@@ -50,7 +56,7 @@ class Ban {
      * @return Ban
      */
     public function updateIp($ip): self {
-
+        if ($this->disableBan()) return $this;
         if (empty($this->clients[$ip])) {
             $this->addIp($ip);
         } else {
@@ -94,6 +100,7 @@ class Ban {
      * @return Ban
      */
     public function addBan($ip): self {
+        if ($this->disableBan()) return $this;
         $info = &$this->clients[$ip];
         foreach (static::BAN_DURATION_STEPS as $duration) {
             if ($info['last_ban_duration'] < $duration) {

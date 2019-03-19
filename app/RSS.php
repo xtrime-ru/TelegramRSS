@@ -82,7 +82,7 @@ class RSS {
         }
 
         //Make the output pretty
-        $dom = new \DOMDocument('1.0');
+        $dom = new \DOMDocument('1.1', 'UTF-8');
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = true;
         $dom->loadXML($xmlFeed->asXML());

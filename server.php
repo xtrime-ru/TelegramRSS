@@ -17,9 +17,9 @@ $longopts = [
 $options = getopt($shortopts, $longopts);
 $options = [
     'server_address' => $options['server_address'] ?? $options['s'] ?? '',
-    'server_port' => $options['port'] ?? $options['p'] ?? '',
+    'server_port' => (int)($options['port'] ?? $options['p'] ?? '0'),
     'client_address' => $options['client_address'] ?? $options['c'] ?? '',
-    'client_port' => $options['port'] ?? $options['o'] ?? '',
+    'client_port' => (int)($options['port'] ?? $options['o'] ?? '0'),
     'help' => isset($options['help']),
 ];
 

@@ -201,9 +201,13 @@ class Controller {
                         'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
                     ]
                 );
-                if ($this->response['data']->_ !== 'messages.channelMessages') {
-                    throw new \UnexpectedValueException('This is not a channel');
+                if (
+                    $this->response['data']->_ !== 'messages.channelMessages' &&
+                    Config::getInstance()->get('access.only_public_channels')
+                ) {
+                    throw new \UnexpectedValueException('This is not a public channel');
                 }
+
             }
 
         } catch (\Exception $e) {

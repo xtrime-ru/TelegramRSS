@@ -19,7 +19,7 @@ return [
     'media' => [
         'max_size' => (int)getenv('MAX_MEDIA_SIZE'),
     ],
-    'ban' => [
+    'access' => [
         'rpm' => (int)getenv('RPM_LIMIT'),
         'ip_blacklist' => array_filter(
             array_map(
@@ -27,6 +27,7 @@ return [
                 explode(',', getenv('IP_BLACKLIST'))
             )
         ),
+        'only_public_channels' => (bool)getenv('ONLY_PUBLIC_CHANNELS'),
     ],
     'timezone' => (string)getenv('TIMEZONE'),
     'log' => [
