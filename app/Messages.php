@@ -37,33 +37,27 @@ class Messages {
             foreach ($messages as $message) {
                 go(
                     function () use ($chan, $message) {
-                        if ($channelUrl = $this->getChannelUrl()) {
+                        $description = $message->message ?? '';
+                        if ($description || $this->hasMedia($message)) {
                             $parsedMessage = [
-                                'url' => $this->getChannelUrl() . $message->id,
+                                'url' => $this->getMessageUrl($message->id),
                                 'title' => null,
-                                'description' => $message->message ?? '',
+                                'description' => $description,
                                 'media' => $this->getMediaInfo($message),
                                 'preview' => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
                                 'timestamp' => $message->date ?? '',
                             ];
-                        } elseif ($description = $message->message ?? '') {
-                            $parsedMessage = [
-                                'url' => null,
-                                'title' => null,
-                                'description' => $description,
-                                'media' => null,
-                                'preview' => null,
-                                'timestamp' => $message->date ?? '',
-                            ];
+
+                            $mime = $message->media->document->mime_type ?? '';
+                            if (strpos($mime, 'video') !== false) {
+                                $parsedMessage['title'] = '[Видео]';
+                            }
+
+                            $chan->push([$message->id => $parsedMessage]);
                         } else {
-                            $parsedMessage = [];
+                            $chan->push([$message->id => []]);
                         }
 
-                        $mime = $message->media->document->mime_type ?? '';
-                        if (strpos($mime, 'video') !== false) {
-                            $parsedMessage['title'] = '[Видео]';
-                        }
-                        $chan->push([$message->id => $parsedMessage]);
                     }
                 );
             }
@@ -79,15 +73,19 @@ class Messages {
         return $this;
     }
 
-    private function getChannelUrl() {
+    /**
+     * @param string $messageId
+     * @return string|null
+     */
+    private function getMessageUrl($messageId = '') {
         if (!$this->channelUrl) {
             $this->username = $this->telegramResponse->chats[0]->username ?? '';
             if (!$this->username) {
-                return '';
+                return null;
             }
             $this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
         }
-        return $this->channelUrl;
+        return $this->channelUrl . $messageId;
     }
 
     private function getMediaInfo($message) {
