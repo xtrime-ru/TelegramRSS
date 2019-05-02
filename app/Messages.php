@@ -12,6 +12,13 @@ class Messages {
     private $username;
     private $client;
 
+    private const MEDIA_TYPES = [
+        'messageMediaDocument',
+        'messageMediaPhoto',
+        'messageMediaVideo',
+        'messageMediaDocument',
+    ];
+
     /**
      * Messages constructor.
      * @param $telegramResponse
@@ -98,12 +105,13 @@ class Messages {
     }
 
     private function hasMedia($message) {
-        if (empty($message->media)) {
+        if (
+            empty($message->media) ||
+            !in_array($message->media->{'_'}, static::MEDIA_TYPES, true)
+        ) {
             return false;
         }
-        if ($message->media->{'_'} === 'messageMediaWebPage') {
-            return false;
-        }
+
         return true;
     }
 
