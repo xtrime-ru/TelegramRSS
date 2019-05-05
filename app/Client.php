@@ -2,6 +2,8 @@
 
 namespace TelegramRSS;
 
+use Swoole\Coroutine;
+
 class Client {
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
@@ -31,7 +33,7 @@ class Client {
     private function get($method, $parameters = [], $retry = 0) {
         if ($retry) {
             //Делаем попытку реконекта
-            sleep(static::RETRY_INTERVAL);
+            Coroutine::sleep(static::RETRY_INTERVAL);
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Log::getInstance()->add('Client crashed and restarting. Resending request.');
         }

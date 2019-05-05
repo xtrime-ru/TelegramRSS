@@ -120,12 +120,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/vlucas/phpdotenv.git",
-                "reference": "dbcc609971dd9b55f48b8008b553d79fd372ddde"
+                "reference": "ffcaf1dfee56c8830d83d9812efad2a98c08f02e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/dbcc609971dd9b55f48b8008b553d79fd372ddde",
-                "reference": "dbcc609971dd9b55f48b8008b553d79fd372ddde",
+                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/ffcaf1dfee56c8830d83d9812efad2a98c08f02e",
+                "reference": "ffcaf1dfee56c8830d83d9812efad2a98c08f02e",
                 "shasum": ""
             },
             "require": {
@@ -164,7 +164,7 @@
                 "env",
                 "environment"
             ],
-            "time": "2019-03-06T09:39:45+00:00"
+            "time": "2019-03-23T10:56:16+00:00"
         }
     ],
     "packages-dev": [
@@ -174,9 +174,18 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/swoole/ide-helper.git",
-                "reference": "cff84462f360a0e281fa8f5fcc91c9420da5b9d9"
+                "reference": "3b0b3e761580dd77c5c72c1c4424efd08053230c"
+            },
+            "require-dev": {
+                "squizlabs/php_codesniffer": "~3.4.0",
+                "zendframework/zend-code": "~3.3.0"
             },
             "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Swoole\\IDEHelper\\": "src/"
+                }
+            },
             "license": [
                 "Apache-2.0"
             ],
@@ -186,8 +195,8 @@
                     "email": "team@swoole.com"
                 }
             ],
-            "description": "swoole-ide-helper",
-            "time": "2019-01-15T02:52:04+00:00"
+            "description": "IDE help files for Swoole.",
+            "time": "2019-04-25T07:05:36+00:00"
         }
     ],
     "aliases": [],
