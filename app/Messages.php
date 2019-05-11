@@ -16,7 +16,6 @@ class Messages {
         'messageMediaDocument',
         'messageMediaPhoto',
         'messageMediaVideo',
-        'messageMediaDocument',
     ];
 
     /**
