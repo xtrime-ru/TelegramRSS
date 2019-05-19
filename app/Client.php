@@ -33,16 +33,16 @@ class Client {
     private function get($method, $parameters = [], $retry = 0) {
         if ($retry) {
             //Делаем попытку реконекта
-            sleep(static::RETRY_INTERVAL);
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Log::getInstance()->add('Client crashed and restarting. Resending request.');
+            Coroutine::sleep(static::RETRY_INTERVAL);
         }
 
         $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
         $curl->post("/api/$method", $parameters);
         $curl->recv(static::TIMEOUT);
 
-        $body = json_decode($curl->body);
+        $body = json_decode($curl->body, false);
         $errorMessage = $body->errors[0]->message ?? '';
         if ($curl->statusCode !== 200 || $curl->errCode || !$body || $errorMessage) {
             if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {

@@ -3,6 +3,8 @@
 namespace TelegramRSS;
 
 
+use Swoole\Coroutine;
+
 class Log {
 
     /**
@@ -80,11 +82,7 @@ class Log {
         if (!$this->needLog) {
             return $this;
         }
-        go(
-            function () use ($text) {
-                file_put_contents("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND | LOCK_EX);
-            }
-        );
+        Coroutine::writeFile("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND | LOCK_EX);
         return $this;
     }
 

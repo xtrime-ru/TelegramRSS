@@ -31,43 +31,26 @@ class Messages {
 
     private function parseMessages(): self {
         if ($messages = $this->telegramResponse->messages ?? []) {
-            $size = count($messages);
-            $chan = new \Co\Channel($size);
             foreach ($messages as $message) {
-                go(
-                    function () use ($chan, $message) {
-                        $description = $message->message ?? '';
-                        if ($description || $this->hasMedia($message)) {
-                            $parsedMessage = [
-                                'url' => $this->getMessageUrl($message->id),
-                                'title' => null,
-                                'description' => $description,
-                                'media' => $this->getMediaInfo($message),
-                                'preview' => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
-                                'timestamp' => $message->date ?? '',
-                            ];
+                $description = $message->message ?? '';
+                if ($description || $this->hasMedia($message)) {
+                    $parsedMessage = [
+                        'url' => $this->getMessageUrl($message->id),
+                        'title' => null,
+                        'description' => $description,
+                        'media' => $this->getMediaInfo($message),
+                        'preview' => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
+                        'timestamp' => $message->date ?? '',
+                    ];
 
-                            $mime = $message->media->document->mime_type ?? '';
-                            if (strpos($mime, 'video') !== false) {
-                                $parsedMessage['title'] = '[Видео]';
-                            }
-
-                            $chan->push([$message->id => $parsedMessage]);
-                        } else {
-                            $chan->push([$message->id => []]);
-                        }
-
+                    $mime = $message->media->document->mime_type ?? '';
+                    if (strpos($mime, 'video') !== false) {
+                        $parsedMessage['title'] = '[Видео]';
                     }
-                );
-            }
 
-            for ($i = 0; $i < $size; $i++) {
-                $element = $chan->pop();
-                $key = array_key_first($element);
-                $this->list[$key] = $element[$key];
+                    $this->list[$message->id] = $parsedMessage;
+                }
             }
-            $this->list = array_filter($this->list);
-            krsort($this->list);
         }
         return $this;
     }
