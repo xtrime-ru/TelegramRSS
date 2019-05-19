@@ -33,7 +33,7 @@ class Client {
     private function get($method, $parameters = [], $retry = 0) {
         if ($retry) {
             //Делаем попытку реконекта
-            Coroutine::sleep(static::RETRY_INTERVAL);
+            sleep(static::RETRY_INTERVAL);
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Log::getInstance()->add('Client crashed and restarting. Resending request.');
         }
