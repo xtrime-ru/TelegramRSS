@@ -74,7 +74,13 @@ class Controller {
         Client $client,
         Ban $ban
     ) {
-        Log::getInstance()->add($request);
+        Log::getInstance()->add([
+            'remote_addr' => $request->header['remote_addr'] ?? $request->server['remote_addr'],
+            'user-agent' => $request->header['user-agent'],
+            'request_uri' => $request->server['request_uri'],
+            'post' => $request->post,
+            'get' => $request->get,
+        ]);
         //Parse request and generate response
 
         $this
