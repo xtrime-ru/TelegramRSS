@@ -75,9 +75,9 @@ class Controller {
         Ban $ban
     ) {
         Log::getInstance()->add([
-            'remote_addr' => $request->header['remote_addr'] ?? $request->server['remote_addr'],
-            'user-agent' => $request->header['user-agent'],
-            'request_uri' => $request->server['request_uri'],
+            'remote_addr' => $request->header['remote_addr'] ?? $request->server['x-forwarded-for'] ?? null,
+            'user-agent' => $request->header['user-agent'] ?? null,
+            'request_uri' => $request->server['request_uri'] ?? $request->server['path_info'] ?? null,
             'post' => $request->post,
             'get' => $request->get,
         ]);
