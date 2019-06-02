@@ -3,28 +3,28 @@ RSS/JSON generator for telegram
 
 Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwooleClient) and output them as RSS or JSON.
 
- **Features**
-  * Fast async swoole server
-  * Use as micro-service to access telegram api
-  * Get any public telegram posts from groups as json or RSS
-  * fail2ban, RPM limits, IP blacklist
-  * Full media support. Access any media from messages via direct links.
-  
- **Proposed Architecture**
- 
- ![Proposed Architecture](https://habrastorage.org/webt/qz/ax/ct/qzaxctkgwehhhsqglgszy4rowwa.png)
+**Features**
+* Fast async swoole server
+* Use as micro-service to access telegram api
+* Get any public telegram posts from groups as json or RSS
+* fail2ban, RPM limits, IP blacklist
+* Full media support. Access any media from messages via direct links.
 
- **Installation**
+**Proposed Architecture**
+
+![Proposed Architecture](https://habrastorage.org/webt/qz/ax/ct/qzaxctkgwehhhsqglgszy4rowwa.png)
+
+**Installation**
  
- 1. Swoole extension required: [Install swoole](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
- 1. Install and run [my telegram client](https://github.com/xtrime-ru/TelegramSwooleClient)
- 1. Clone this project
- 1. `composer install`
+1. Swoole extension required: [Install swoole](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
+1. Install and run [my telegram client](https://github.com/xtrime-ru/TelegramSwooleClient)
+1. Clone this project
+1. `composer install`
    
-     _Optional:_
- 1. Create .env from .env.example
- 1. Edit .env if needed
- 1. Use supervisor to monitor and restart swoole servers. Example of `/etc/supervisor/conf.d/telegram_rss.conf`: 
+    _Optional:_
+1. Create .env from .env.example
+1. Edit .env if needed
+1. Use supervisor to monitor and restart swoole servers. Example of `/etc/supervisor/conf.d/telegram_rss.conf`: 
      ```
     [program:telegram_rss]
     command=/usr/bin/php /home/admin/web/tg.i-c-a.su/TelegramRSS/server.php
@@ -35,7 +35,7 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     stdout_logfile=none
     redirect_stderr=true
      ```
- 1. Nginx config     
+1. Nginx config     
     ```
     server {
         listen      %ip%:443 ssl;
@@ -59,13 +59,13 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
         }
     
     }
-
+    
      ```
   
- **Usage**
- 1. Run [client](https://github.com/xtrime-ru/TelegramSwooleClient) 
- 1. Check that address and port of client are correct in .env file
- 1. run rss server `php server.php`
+**Usage**
+1. Run [client](https://github.com/xtrime-ru/TelegramSwooleClient) 
+1. Check that address and port of client are correct in .env file
+1. run rss server `php server.php`
 
     Examples:
     
@@ -80,7 +80,12 @@ Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwo
     
     Default address of rss server is http://127.0.0.1:9504/
     
- **Contacts**
+**Contacts**
 
- * Telegram: [@xtrime](tg://resolve?domain=xtrime)
- * Email: alexander(at)i-c-a.su
+* Telegram: [@xtrime](tg://resolve?domain=xtrime)
+* Email: alexander(at)i-c-a.su
+
+**Donations**
+
+* BTC: 1BE1nitXgEAxg7A5tgec67ucNryQwusoiP
+* ETH: 0x0e2d369E28DCA2336803b9dE696eCDa50ff61e27
