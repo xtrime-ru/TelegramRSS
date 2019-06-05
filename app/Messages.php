@@ -74,7 +74,7 @@ class Messages {
         if (!$this->hasMedia($message)) {
             return [];
         }
-        $info = $this->client->getMediaInfo($message);
+        $info = $this->client->getMediaInfo($message->media);
         if (!empty($info->size) && !empty($info->mime)) {
             return [
                 'url' => $this->getMediaUrl($message),
@@ -87,7 +87,11 @@ class Messages {
     private function hasMedia($message) {
         if (
             empty($message->media) ||
-            !in_array($message->media->{'_'}, static::MEDIA_TYPES, true)
+            !in_array($message->media->{'_'}, static::MEDIA_TYPES, true) ||
+            (
+                isset($message->media->photo) &&
+                empty($message->media->photo)
+            )
         ) {
             return false;
         }
