@@ -1,7 +1,7 @@
 # TelegramRSS
 RSS/JSON generator for telegram
 
-Get posts via my [TelegramSwooleClient](https://github.com/xtrime-ru/TelegramSwooleClient) and output them as RSS or JSON.
+Get posts via my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiServer) and output them as RSS or JSON.
 
 **Features**
 * Fast async swoole server
