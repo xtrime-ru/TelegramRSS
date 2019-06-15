@@ -6,34 +6,33 @@ if (PHP_SAPI !== 'cli') {
     throw new \RuntimeException('Start in CLI');
 }
 
-$shortopts = 's::p::c::o';
 $longopts = [
-    'server_address::', // ip адрес сервера, необязательное значение
-    'server_port::',  // порт сервера, необязательное значение
-    'client_address::',  // ip телеграм-клиента, необязательное значение
-    'client_port::',  // порт телеграм-клиента, необязательное значение
+    'server-address::', // ip адрес сервера, необязательное значение
+    'server-port::',  // порт сервера, необязательное значение
+    'client-address::',  // ip телеграм-клиента, необязательное значение
+    'client-port::',  // порт телеграм-клиента, необязательное значение
     'help', //нужна ли справка?
 ];
-$options = getopt($shortopts, $longopts);
+$options = getopt('', $longopts);
 $options = [
-    'server_address' => $options['server_address'] ?? $options['s'] ?? '',
-    'server_port' => (int)($options['port'] ?? $options['p'] ?? '0'),
-    'client_address' => $options['client_address'] ?? $options['c'] ?? '',
-    'client_port' => (int)($options['port'] ?? $options['o'] ?? '0'),
+    'server-address' => $options['server-address'] ?? '',
+    'server-port' => (int)($options['server-port'] ?? 0),
+    'client-address' => $options['client_address'] ?? '',
+    'client-port' => (int)($options['client-port'] ?? 0),
     'help' => isset($options['help']),
 ];
 
 if ($options['help']) {
-    $help = 'Fast, simple, async php telegram server (based on Swoole Server)
+    $help = 'Fast, simple, async php telegram rss/json server (based on Swoole Server)
 
-usage: php server.php [--help] [-s|--server=127.0.0.1] [-p|--server_port=9504] [-c|--client=127.0.0.1] [-o|--client_port=9503]
+usage: php server.php [--help] [--server-address=127.0.0.1] [--server-port=9504] [--client-address=127.0.0.1] [--client-port=9503]
 
 Options:
-        --help              Show this message
-    -s  --server_address    Server address (optional) (example: 127.0.0.1)
-    -p  --server_port       Server port (optional) (example: 9504)
-    -c  --client_address    Telegram Client address (optional) (example: 127.0.0.1)
-    -o  --client_port       Telegram Client port (optional) (example: 9503)
+    --help              Show this message
+    --server-address    Server address (optional) (default: 127.0.0.1)
+    --server-port       Server port (optional) (default: 9504)
+    --client-address    Telegram Client address (optional) (default: 127.0.0.1)
+    --client-port       Telegram Client port (optional) (default: 9503)
 
 
 Also all options can be set in .env file (see .env.example)
@@ -49,5 +48,5 @@ Example:
     exit;
 }
 
-$client = new \TelegramRSS\Client($options['client_address'], $options['client_port']);
-new \TelegramRSS\Server($client, $options['server_address'], $options['server_port']);
+$client = new \TelegramRSS\Client($options['client-address'], $options['client-port']);
+new \TelegramRSS\Server($client, $options['server-address'], $options['server-port']);
