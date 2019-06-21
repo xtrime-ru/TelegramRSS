@@ -72,22 +72,6 @@ class Client {
         return $this->get('getHistory', ['data' => $data]);
     }
 
-    public function get_self() {
-        return $this->get('get_self');
-    }
-
-    public function getMessage($data) {
-        $data = array_merge(
-            [
-                'channel' => '',
-                'id' => [0],
-            ],
-            $data
-        );
-
-        return $this->get('channels.getMessages', ['data' => $data]);
-    }
-
     public function getMedia($data) {
         $data = array_merge(
             [
