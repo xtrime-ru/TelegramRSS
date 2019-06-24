@@ -39,7 +39,8 @@ class Client {
         }
 
         $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
-        $curl->post("/api/$method", $parameters);
+        $curl->setHeaders(['Content-Type' => 'application/json']);
+        $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);
 
         $body = json_decode($curl->body, false);
@@ -98,6 +99,6 @@ class Client {
     }
 
     public function getMediaInfo(object $message) {
-        return $this->get('get_download_info', ['message' => $message]);
+        return $this->get('getDownloadInfo', ['message' => $message]);
     }
 }
