@@ -19,33 +19,31 @@ class Controller {
         'html' => [
             'type' => 'html',
             'headers' => [
-                ['Content-Type', 'text/html;charset=utf-8'],
+                'Content-Type'=> 'text/html;charset=utf-8',
             ],
         ],
         'rss' => [
             'type' => 'rss',
             'headers' => [
-                ['Content-Type', 'application/rss+xml;charset=utf-8'],
+                'Content-Type' => 'application/rss+xml;charset=utf-8',
             ],
         ],
         'json' => [
             'type' => 'json',
             'headers' => [
-                ['Content-Type', 'application/json;charset=utf-8'],
+                'Content-Type' => 'application/json;charset=utf-8',
             ],
         ],
         'media' => [
             'type' => 'media',
             'headers' => [],
-            'unlink' => true,
         ],
         'favicon.ico' => [
             'type' => 'favicon.ico',
             'headers' => [
-                ['Content-Length', 34494],
-                ['Content-Type', 'image/x-icon'],
+                'Content-Length' => 34494,
+                'Content-Type' => 'image/x-icon',
             ],
-            'unlink' => false,
         ],
     ];
 
@@ -93,16 +91,10 @@ class Controller {
 
         $response->status($this->response['code']);
 
-        foreach ($this->response['headers'] as $header) {
-            $response->header(...$header);
-        }
+        $response->header = $this->response['headers'];
 
         if ($this->response['file']) {
             $response->sendfile($this->response['file']);
-            if ($this->response['unlink']) {
-                unlink($this->response['file']);
-            }
-
         } else {
             $response->end($this->response['data']);
         }
@@ -194,6 +186,16 @@ class Controller {
                         $this->request['message'],
                     ],
                 ];
+
+                $info = $client->getInfo($this->request['peer']);
+
+                if (
+                    $info['type'] !== 'channel' &&
+                    Config::getInstance()->get('access.only_public_channels')
+                ) {
+                    throw new \UnexpectedValueException('This is not a public channel');
+                }
+
                 if ($this->request['preview']) {
                     $this->response['data'] = $client->getMediaPreview($data);
                 } else {
@@ -258,7 +260,7 @@ class Controller {
         try {
             switch ($this->response['type']) {
                 case 'html':
-                    $this->response['data'] = file_get_contents($this->indexPage);
+                    $this->response['file'] = $this->indexPage;
                     break;
                 case 'json':
                     $this->response['data'] = json_encode(
@@ -274,14 +276,11 @@ class Controller {
                     $this->response['data'] = $rss->get();
                     break;
                 case 'media':
-                    $this->response['file'] = $this->response['data']->file;
-                    $this->response['headers'] = $this->response['data']->headers;
-                    $this->response['data'] = null;
-                    $this->response['unlink'] = $this->responseList['media']['unlink'];
+                    $this->response['headers'] = $this->response['data']['headers'];
+                    $this->response['data'] = $this->response['data']['file'];
                     break;
                 case 'favicon.ico':
                     $this->response['file'] = __DIR__ . '/../favicon.ico';
-                    $this->response['unlink'] = $this->responseList['favicon.ico']['unlink'];
                     break;
                 default:
                     $this->response['data'] = 'Unknown response type';

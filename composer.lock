@@ -120,12 +120,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/vlucas/phpdotenv.git",
-                "reference": "5084b23845c24dbff8ac6c204290c341e4776c92"
+                "reference": "9159290ad347bf56fa6d208bf35645c450f9e567"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/5084b23845c24dbff8ac6c204290c341e4776c92",
-                "reference": "5084b23845c24dbff8ac6c204290c341e4776c92",
+                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/9159290ad347bf56fa6d208bf35645c450f9e567",
+                "reference": "9159290ad347bf56fa6d208bf35645c450f9e567",
                 "shasum": ""
             },
             "require": {
@@ -153,9 +153,14 @@
             ],
             "authors": [
                 {
+                    "name": "Graham Campbell",
+                    "email": "graham@alt-three.com",
+                    "homepage": "https://gjcampbell.co.uk/"
+                },
+                {
                     "name": "Vance Lucas",
                     "email": "vance@vancelucas.com",
-                    "homepage": "http://www.vancelucas.com"
+                    "homepage": "https://vancelucas.com/"
                 }
             ],
             "description": "Loads environment variables from `.env` to `getenv()`, `$_ENV` and `$_SERVER` automagically.",
@@ -164,7 +169,7 @@
                 "env",
                 "environment"
             ],
-            "time": "2019-06-15T22:40:20+00:00"
+            "time": "2019-06-29T14:13:05+00:00"
         }
     ],
     "packages-dev": [

@@ -26,11 +26,12 @@ class Client {
     /**
      * @param $method
      * @param array $parameters
+     * @param string $responseType
      * @param int $retry
      * @return object
      * @throws \Exception
      */
-    private function get($method, $parameters = [], $retry = 0) {
+    private function get($method, $parameters = [], string $responseType = 'json', $retry = 0) {
         if ($retry) {
             //Делаем попытку реконекта
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
@@ -43,11 +44,36 @@ class Client {
         $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);
 
-        $body = json_decode($curl->body, false);
-        $errorMessage = $body->errors[0]->message ?? '';
+        $body = '';
+        $errorMessage = '';
+
+        if (strpos($curl->headers['content-type'], 'json')!==false) {
+            $responseType = 'json';
+        }
+
+        switch ($responseType) {
+            case 'json':
+                $body = json_decode($curl->body, false);
+                $errorMessage = $body->errors[0]->message ?? '';
+                break;
+            case 'media':
+                if ($curl->statusCode === 200) {
+                    $body = (object) [
+                        'response' => [
+                            'file' => $curl->body,
+                            'headers' => [
+                                'Content-Length' => $curl->headers['content-length'],
+                                'Content-Type' => $curl->headers['content-type'],
+                            ]
+                        ],
+                    ];
+                }
+                break;
+        }
+
         if ($curl->statusCode !== 200 || $curl->errCode || !$body || $errorMessage) {
             if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {
-                return $this->get($method, $parameters, ++$retry);
+                return $this->get($method, $parameters, $responseType, ++$retry);
             }
             if ($errorMessage) {
                 throw new \UnexpectedValueException($errorMessage, $body->errors[0]->code ?? 400);
@@ -83,7 +109,7 @@ class Client {
             $data
         );
 
-        return $this->get('getMedia', ['data' => $data]);
+        return $this->get('getMedia', ['data' => $data], 'media');
     }
 
     public function getMediaPreview($data) {
@@ -95,10 +121,14 @@ class Client {
             $data
         );
 
-        return $this->get('getMediaPreview', ['data' => $data]);
+        return $this->get('getMediaPreview', ['data' => $data], 'media');
     }
 
     public function getMediaInfo(object $message) {
         return $this->get('getDownloadInfo', ['message' => $message]);
+    }
+    
+    public function getInfo($peer) {
+        return $this->get('getInfo', $peer);
     }
 }
