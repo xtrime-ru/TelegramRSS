@@ -190,7 +190,7 @@ class Controller {
                 $info = $client->getInfo($this->request['peer']);
 
                 if (
-                    $info['type'] !== 'channel' &&
+                    $info->type !== 'channel' &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
                     throw new \UnexpectedValueException('This is not a public channel');
