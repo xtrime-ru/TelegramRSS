@@ -4,7 +4,8 @@ namespace TelegramRSS;
 
 use Swoole\Coroutine;
 
-class Client {
+class Client
+{
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
     private const TIMEOUT = 1;
@@ -12,10 +13,12 @@ class Client {
 
     /**
      * Client constructor.
+     *
      * @param string $address
-     * @param string $port
+     * @param int $port
      */
-    public function __construct(string $address = '', int $port = 0) {
+    public function __construct(string $address = '', int $port = 0)
+    {
         $this->config = Config::getInstance()->get('client');
         $this->config = [
             'address' => $address ?: $this->config['address'],
@@ -23,15 +26,66 @@ class Client {
         ];
     }
 
+    public function getHistory(array $data)
+    {
+        $data = array_merge(
+            [
+                'peer' => '',
+                'limit' => 10,
+            ],
+            $data
+        );
+        return $this->get('getHistory', ['data' => $data]);
+    }
+
+    public function getMedia(array $data)
+    {
+        $data = array_merge(
+            [
+                'peer' => '',
+                'id' => [0],
+                'size_limit' => Config::getInstance()->get('media.max_size'),
+            ],
+            $data
+        );
+
+        return $this->get('getMedia', ['data' => $data], 'media');
+    }
+
+    public function getMediaPreview(array $data)
+    {
+        $data = array_merge(
+            [
+                'peer' => '',
+                'id' => [0],
+            ],
+            $data
+        );
+
+        return $this->get('getMediaPreview', ['data' => $data], 'media');
+    }
+
+    public function getMediaInfo(object $message)
+    {
+        return $this->get('getDownloadInfo', ['message' => $message]);
+    }
+
+    public function getInfo($peer)
+    {
+        return $this->get('getInfo', $peer);
+    }
+
     /**
-     * @param $method
-     * @param array $parameters
+     * @param string $method
+     * @param mixed $parameters
      * @param string $responseType
      * @param int $retry
+     *
      * @return object
      * @throws \Exception
      */
-    private function get($method, $parameters = [], string $responseType = 'json', $retry = 0) {
+    private function get(string $method, $parameters = [], string $responseType = 'json', $retry = 0)
+    {
         if ($retry) {
             //Делаем попытку реконекта
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
@@ -41,13 +95,13 @@ class Client {
 
         $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
         $curl->setHeaders(['Content-Type' => 'application/json']);
-        $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_IGNORE));
+        $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);
 
         $body = '';
         $errorMessage = '';
 
-        if (strpos($curl->headers['content-type'], 'json')!==false) {
+        if (strpos($curl->headers['content-type'], 'json') !== false) {
             $responseType = 'json';
         }
 
@@ -58,13 +112,13 @@ class Client {
                 break;
             case 'media':
                 if ($curl->statusCode === 200) {
-                    $body = (object) [
+                    $body = (object)[
                         'response' => [
                             'file' => $curl->body,
                             'headers' => [
                                 'Content-Length' => $curl->headers['content-length'],
                                 'Content-Type' => $curl->headers['content-type'],
-                            ]
+                            ],
                         ],
                     ];
                 }
@@ -86,49 +140,5 @@ class Client {
         }
         return $result;
 
-    }
-
-    public function getHistory($data) {
-        $data = array_merge(
-            [
-                'peer' => '',
-                'limit' => 10,
-            ],
-            $data
-        );
-        return $this->get('getHistory', ['data' => $data]);
-    }
-
-    public function getMedia($data) {
-        $data = array_merge(
-            [
-                'channel' => '',
-                'id' => [0],
-                'size_limit' => Config::getInstance()->get('media.max_size'),
-            ],
-            $data
-        );
-
-        return $this->get('getMedia', ['data' => $data], 'media');
-    }
-
-    public function getMediaPreview($data) {
-        $data = array_merge(
-            [
-                'channel' => '',
-                'id' => [0],
-            ],
-            $data
-        );
-
-        return $this->get('getMediaPreview', ['data' => $data], 'media');
-    }
-
-    public function getMediaInfo(object $message) {
-        return $this->get('getDownloadInfo', ['message' => $message]);
-    }
-    
-    public function getInfo($peer) {
-        return $this->get('getInfo', $peer);
     }
 }

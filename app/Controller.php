@@ -181,7 +181,7 @@ class Controller {
         try {
             if ($this->response['type'] === 'media') {
                 $data = [
-                    'channel' => $this->request['peer'],
+                    'peer' => $this->request['peer'],
                     'id' => [
                         $this->request['message'],
                     ],
