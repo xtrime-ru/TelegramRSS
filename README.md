@@ -12,7 +12,7 @@ Get posts via my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSer
 
 **Proposed Architecture**
 
-![Proposed Architecture](https://habrastorage.org/webt/qz/ax/ct/qzaxctkgwehhhsqglgszy4rowwa.png)
+![Proposed Architecture](https://hsto.org/webt/j-/ob/ky/j-obkye1dv68ngsrgi12qevutra.png)
 
 **Installation**
  
