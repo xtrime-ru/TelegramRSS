@@ -154,10 +154,6 @@ class Controller {
             $this->response['errors'][] = "BOTS NOT ALLOWED";
         }
 
-        if (preg_match('/[A-Z]/', $this->request['peer'])) {
-            $this->response['errors'][] = "UPPERCASE NOT SUPPORTED";
-        }
-
         if ($ban && $this->request['peer']) {
             $timeLeft = $ban->updateIp($this->request['ip'])->timeLeft($this->request['ip']);
             if ($timeLeft) {
