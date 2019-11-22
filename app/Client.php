@@ -111,7 +111,7 @@ class Client
                 $errorMessage = $body->errors[0]->message ?? '';
                 break;
             case 'media':
-                if ($curl->statusCode === 200) {
+                if ($curl->statusCode === 200 && $curl->body) {
                     $body = (object)[
                         'response' => [
                             'file' => $curl->body,
@@ -125,7 +125,7 @@ class Client
                 break;
         }
 
-        if ($curl->statusCode !== 200 || $curl->errCode || !$body || $errorMessage) {
+        if ($curl->statusCode !== 200 || $curl->errCode || !$body || !$curl->body || $errorMessage) {
             if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {
                 return $this->get($method, $parameters, $responseType, ++$retry);
             }
