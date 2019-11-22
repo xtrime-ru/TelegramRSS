@@ -26,7 +26,7 @@ class Client
         ];
     }
 
-    public function getHistory(array $data)
+    public function getHistoryHtml(array $data)
     {
         $data = array_merge(
             [
@@ -35,7 +35,7 @@ class Client
             ],
             $data
         );
-        return $this->get('getHistory', ['data' => $data]);
+        return $this->get('getHistoryHtml', ['data' => $data]);
     }
 
     public function getMedia(array $data)

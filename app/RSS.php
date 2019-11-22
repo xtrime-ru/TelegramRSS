@@ -4,7 +4,7 @@ namespace TelegramRSS;
 
 
 class RSS {
-    private const TITLE = 'ICA telegram feed';
+    private const TITLE = 'ICA Telegram feed';
     private const DESCRIPTION = 'Публичный канал Telegram в формате RSS';
     private const LINK = 'https://i-c-a.su';
 

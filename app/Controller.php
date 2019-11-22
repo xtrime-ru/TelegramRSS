@@ -198,7 +198,7 @@ class Controller {
                     $this->response['data'] = $client->getMedia($data);
                 }
             } elseif ($this->request['peer']) {
-                $this->response['data'] = $client->getHistory(
+                $this->response['data'] = $client->getHistoryHtml(
                     [
                         'peer' => $this->request['peer'],
                         'limit' => $this->request['limit'],
