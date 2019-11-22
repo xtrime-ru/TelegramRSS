@@ -17,7 +17,7 @@ $options = getopt('', $longopts);
 $options = [
     'server-address' => $options['server-address'] ?? '',
     'server-port' => (int)($options['server-port'] ?? 0),
-    'client-address' => $options['client_address'] ?? '',
+    'client-address' => $options['client-address'] ?? '',
     'client-port' => (int)($options['client-port'] ?? 0),
     'help' => isset($options['help']),
 ];
