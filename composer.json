@@ -7,7 +7,7 @@
     "keywords": ["telegram", "mtproto", "protocol", "client", "PHP", "swoole", "async", "daemon", "coroutine", "parser", "micro-service", "RSS"],
     "require": {
         "php": ">=7.2.0",
-        "vlucas/phpdotenv": "^3.3",
+        "vlucas/phpdotenv": "^4",
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
@@ -22,7 +22,6 @@
             "url": "https://github.com/swoole/ide-helper.git"
         }
     ],
-    "minimum-stability": "dev",
     "authors": [
         {
             "name": "Alexander Pankratov",

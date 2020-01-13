@@ -1,18 +1,18 @@
 # TelegramRSS
 RSS/JSON generator for telegram
 
-Get posts via my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiServer) and output them as RSS or JSON.
+Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiServer) and output them as RSS or JSON.
 
 **Features**
-* Fast async swoole server
+* Fast async Swoole server
 * Use as micro-service to access telegram api
 * Get any public telegram posts from groups as json or RSS
 * fail2ban, RPM limits, IP blacklist
 * Full media support. Access any media from messages via direct links.
 
-**Proposed Architecture**
+**Architecture Example**
 
-![Proposed Architecture](https://hsto.org/webt/j-/ob/ky/j-obkye1dv68ngsrgi12qevutra.png)
+![Architecture Example](https://hsto.org/webt/j-/ob/ky/j-obkye1dv68ngsrgi12qevutra.png)
 
 **Installation**
  
@@ -78,7 +78,7 @@ Get posts via my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSer
     * https://tg.i-c-a.su/media/breakingmash/10738/preview
     * https://tg.i-c-a.su/media/breakingmash/10738
     
-    Default address of rss server is http://127.0.0.1:9504/
+    Default address of rss server is `http://127.0.0.1:9504/`
     
 **Contacts**
 

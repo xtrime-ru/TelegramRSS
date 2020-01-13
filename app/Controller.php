@@ -2,6 +2,12 @@
 
 namespace TelegramRSS;
 
+use Exception;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+use Throwable;
+use UnexpectedValueException;
+
 class Controller {
     private const POSTS_MAX_LIMIT = 100;
 
@@ -61,14 +67,14 @@ class Controller {
 
     /**
      * Controller constructor.
-     * @param \Swoole\Http\Request $request
-     * @param \Swoole\Http\Response $response
+     * @param Request $request
+     * @param Response $response
      * @param Client $client
      * @param Ban $ban
      */
     public function __construct(
-        \Swoole\Http\Request $request,
-        \Swoole\Http\Response $response,
+        Request $request,
+        Response $response,
         Client $client,
         Ban $ban
     ) {
@@ -102,10 +108,10 @@ class Controller {
     }
 
     /**
-     * @param \Swoole\Http\Request $request
+     * @param Request $request
      * @return Controller
      */
-    private function route(\Swoole\Http\Request $request): self {
+    private function route(Request $request): self {
         //nginx proxy pass ?? custom header ?? default value
         $this->request['ip'] = $request->header['x-real-ip'] ?? $request->header['remote_addr'] ?? $request->server['remote_addr'];
 
@@ -189,7 +195,7 @@ class Controller {
                     $info->type !== 'channel' &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
-                    throw new \UnexpectedValueException('This is not a public channel');
+                    throw new UnexpectedValueException('This is not a public channel');
                 }
 
                 if ($this->request['preview']) {
@@ -209,12 +215,12 @@ class Controller {
                     $this->response['data']->_ !== 'messages.channelMessages' &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
-                    throw new \UnexpectedValueException('This is not a public channel');
+                    throw new UnexpectedValueException('This is not a public channel');
                 }
 
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->response['errors'][] = [
                 'code' => $e->getCode(),
                 'message' => $e->getMessage(),
@@ -285,7 +291,7 @@ class Controller {
             if (!$this->response['headers']) {
                 $this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->response['errors'][] = [
                 'code' => $e->getCode(),
                 'message' => $e->getMessage(),

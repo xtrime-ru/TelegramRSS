@@ -18,7 +18,7 @@ if (!file_exists('.env')) {
 }
 //Check if root env file hash been loaded (in case plugin installed in existing project)
 if (!getenv('SWOOLE_SERVER_ADDRESS')) {
-    Dotenv\Dotenv::create($root, '.env')->load();
+    Dotenv\Dotenv::createImmutable($root, '.env')->load();
 }
 
 date_default_timezone_set(getenv('TIMEZONE', 'UTC'));
