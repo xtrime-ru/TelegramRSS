@@ -31,7 +31,7 @@ class Controller {
         'rss' => [
             'type' => 'rss',
             'headers' => [
-                'Content-Type' => 'application/rss+xml;charset=utf-8',
+                'Content-Type' => 'text/xml;charset=UTF-8',
             ],
         ],
         'json' => [
