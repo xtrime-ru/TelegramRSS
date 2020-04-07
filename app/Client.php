@@ -101,7 +101,9 @@ class Client
         $body = '';
         $errorMessage = '';
 
-        if (strpos($curl->headers['content-type'], 'json') !== false) {
+        if ($curl->statusCode === 302 && !empty($curl->headers['location'])) {
+            $responseType = 'redirect';
+        } elseif (strpos($curl->headers['content-type'], 'json') !== false) {
             $responseType = 'json';
         }
 
@@ -128,9 +130,18 @@ class Client
                     ];
                 }
                 break;
+            case 'redirect':
+                $body = (object)[
+                    'response' => [
+                        'headers' => [
+                            'Location' => $curl->headers['location'],
+                        ],
+                    ],
+                ];
+                break;
         }
 
-        if ($curl->statusCode !== 200 || $curl->errCode || !$body || !$curl->body || $errorMessage) {
+        if (!in_array($curl->statusCode, [200,302], true) || $curl->errCode || $errorMessage) {
             if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {
                 return $this->get($method, $parameters, $responseType, ++$retry);
             }

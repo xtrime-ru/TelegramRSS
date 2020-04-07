@@ -203,6 +203,9 @@ class Controller {
                 } else {
                     $this->response['data'] = $client->getMedia($data);
                 }
+                if (!empty($this->response['data']['headers']['Location'])) {
+                    $this->response['type'] = 'redirect';
+                }
             } elseif ($this->request['peer']) {
                 $this->response['data'] = $client->getHistoryHtml(
                     [
@@ -280,6 +283,11 @@ class Controller {
                 case 'media':
                     $this->response['headers'] = $this->response['data']['headers'];
                     $this->response['data'] = $this->response['data']['file'];
+                    break;
+                case 'redirect':
+                    $this->response['headers'] = $this->response['data']['headers'];
+                    $this->response['data'] = null;
+                    $this->response['code'] = 302;
                     break;
                 case 'favicon.ico':
                     $this->response['file'] = __DIR__ . '/../favicon.ico';
