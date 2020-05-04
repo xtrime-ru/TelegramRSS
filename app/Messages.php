@@ -16,6 +16,7 @@ class Messages {
         'messageMediaDocument',
         'messageMediaPhoto',
         'messageMediaVideo',
+        'messageMediaWebPage',
     ];
 
     /**
@@ -45,7 +46,18 @@ class Messages {
 
                     $mime = $message->media->document->mime_type ?? '';
                     if (strpos($mime, 'video') !== false) {
-                        $parsedMessage['title'] = '[Видео]';
+                        $parsedMessage['title'] = '[Video]';
+                    }
+
+                    if (!empty($message->media->webpage)) {
+                        $parsedMessage['webpage'] = [
+                            'site_name' => $message->media->webpage->site_name,
+                            'title' => $message->media->webpage->title,
+                            'description' => $message->media->webpage->description,
+                            'preview' => $parsedMessage['preview'],
+                            'url' => $message->media->webpage->url,
+                        ];
+                        $parsedMessage['preview'] = '';
                     }
 
                     $this->list[$message->id] = $parsedMessage;
@@ -74,7 +86,12 @@ class Messages {
         if (!$this->hasMedia($message)) {
             return [];
         }
-        $info = $this->client->getMediaInfo($message->media);
+        if (!empty($message->media->webpage->photo)) {
+            $media = $message->media->webpage->photo;
+        } else {
+            $media = $message->media;
+        }
+        $info = $this->client->getMediaInfo($media);
         if (!empty($info->size) && !empty($info->mime)) {
             return [
                 'url' => $this->getMediaUrl($message),

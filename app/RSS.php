@@ -4,19 +4,23 @@ namespace TelegramRSS;
 
 
 class RSS {
-    private const TITLE = 'ICA Telegram feed';
-    private const DESCRIPTION = 'Публичный канал Telegram в формате RSS';
-    private const LINK = 'https://i-c-a.su';
+    private string $title = 'Channel';
+    private const DESCRIPTION = 'Telegram public channel RSS feed';
+    private const LINK = 'https://tg.i-c-a.su';
 
-    /** @var string */
-    private $rss;
+    private string $rss;
 
     /**
      * RSS constructor.
      * @param array $messages
-     * @param string $selfLink
+     * @param string $peer
      */
-    public function __construct(array $messages, string $selfLink) {
+    public function __construct(array $messages, string $peer) {
+        $url = Config::getInstance()->get('url');
+        $selfLink = "$url/rss/{$peer}";
+
+        $this->title .= ": $peer";
+
         $this->createRss($messages, $selfLink);
     }
 
@@ -38,7 +42,7 @@ class RSS {
 
         $xmlFeed->addChild('channel');
         //Required elements
-        $xmlFeed->channel->addChild('title', static::TITLE);
+        $xmlFeed->channel->addChild('title', $this->title);
         $xmlFeed->channel->addChild('link', static::LINK);
         $xmlFeed->channel->addChild('description', static::DESCRIPTION);
         $xmlFeed->channel->addChild('pubDate', $lastBuildDate);
@@ -49,22 +53,29 @@ class RSS {
         $atomLink->addAttribute('type', 'application/rss+xml');
         $atomLink->addAttribute('href', $selfLink);
 
-        //Optional elements
-        //if (!empty($messages['description'])) $xmlFeed->channel->description = htmlspecialchars($messages['description'], ENT_XML1);
-        //if (!empty($messages['home_page_url'])) $xmlFeed->channel->link = $messages['home_page_url'];
-        //Items
         foreach ($messages as $item) {
             $newItem = $xmlFeed->channel->addChild('item');
             //Standard stuff
             if (!empty($item['id'])) $newItem->addChild('guid', $item['id']);
             if (!empty($item['title'])) $newItem->addChild('title', htmlspecialchars($item['title'], ENT_XML1));
-            if (!empty($item['description']) || !empty($item['preview'])) {
+            if (!empty($item['description']) || !empty($item['preview']) || !empty($item['webpage'])) {
                 $description = '';
                 if ($item['preview']) {
                     $description .= '<img src="' . $item['preview'] . '" style="max-width:100%"/>';
                     $description .= '<br/><br/>';
                 }
                 $description .= $item['description'];
+                if (!empty($item['webpage'])) {
+                    if ($description) {
+                        $description .= '<br/><br/>';
+                    }
+                    $description .= "<blockquote cite=\"{$item['webpage']['url']}\">";
+                    $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
+                    $description .= "<b>{$item['webpage']['title']}</b></br>";
+                    $description .= "{$item['webpage']['description']}</br>";
+                    $description .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
+                    $description .= '</blockquote>';
+                }
                 $newItem->addChild('description', htmlspecialchars($description, ENT_XML1));
             }
             if (!empty($item['timestamp'])) $newItem->addChild('pubDate', date(DATE_RSS, $item['timestamp']));

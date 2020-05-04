@@ -274,10 +274,8 @@ class Controller {
                     );
                     break;
                 case 'rss':
-                    $url = Config::getInstance()->get('url');
-                    $selfLink = "$url/rss/{$this->request['peer']}";
                     $messages = new Messages($this->response['data'], $client);
-                    $rss = new RSS($messages->get(), $selfLink);
+                    $rss = new RSS($messages->get(), $this->request['peer']);
                     $this->response['data'] = $rss->get();
                     break;
                 case 'media':
