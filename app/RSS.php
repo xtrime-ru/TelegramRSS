@@ -60,10 +60,14 @@ class RSS {
             if (!empty($item['title'])) $newItem->addChild('title', htmlspecialchars($item['title'], ENT_XML1));
             if (!empty($item['description']) || !empty($item['preview']) || !empty($item['webpage'])) {
                 $description = '';
-                if ($item['preview']) {
-                    $description .= '<img src="' . $item['preview'] . '" style="max-width:100%"/>';
-                    $description .= '<br/><br/>';
+                foreach ($item['preview'] as $url) {
+                    $description .= "<a href=\"{$url}\" target=\"_blank\" rel=\"nofollow\">";
+                    $description .= "<img src=\"{$url}/preview\" style=\"max-width:100%\"/>";
+                    $description .= '</a>';
+                    $description .= '<br/>';
                 }
+                $description .= '<br/>';
+
                 $description .= $item['description'];
                 if (!empty($item['webpage'])) {
                     if ($description) {
@@ -71,9 +75,13 @@ class RSS {
                     }
                     $description .= "<blockquote cite=\"{$item['webpage']['url']}\">";
                     $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
-                    $description .= "<b>{$item['webpage']['title']}</b></br>";
+                    if ($item['webpage']['title']) {
+                        $description .= "<b>{$item['webpage']['title']}</b></br>";
+                    }
                     $description .= "{$item['webpage']['description']}</br>";
-                    $description .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
+                    if ($item['webpage']['preview']) {
+                        $description .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
+                    }
                     $description .= '</blockquote>';
                 }
                 $newItem->addChild('description', htmlspecialchars($description, ENT_XML1));
@@ -84,10 +92,11 @@ class RSS {
                 $newItem->addChild('guid', $item['url']);
             }
             if (!empty($item['media'])) {
+                $media = $item['media'];
                 $enclosure = $newItem->addChild('enclosure');
-                $enclosure['url'] = $item['media']['url'];
-                $enclosure['type'] = $item['media']['mime'];
-                $enclosure['length'] = $item['media']['size'];
+                $enclosure['url'] = $media['url'];
+                $enclosure['type'] = $media['mime'];
+                $enclosure['length'] = $media['size'];
                 unset($enclosure);
             }
         }

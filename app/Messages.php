@@ -32,7 +32,16 @@ class Messages {
 
     private function parseMessages(): self {
         if ($messages = $this->telegramResponse->messages ?? []) {
-            foreach ($messages as $message) {
+            $groupedMessages = [];
+            foreach ($messages as $key => $message) {
+                if (
+                    !empty($message->grouped_id) &&
+                    !empty($messages[$key + 1]->grouped_id) &&
+                    $messages[$key + 1]->grouped_id === $message->grouped_id
+                ) {
+                    $groupedMessages[] = $message;
+                    continue;
+                }
                 $description = $message->message ?? '';
                 if ($description || $this->hasMedia($message)) {
                     $parsedMessage = [
@@ -40,9 +49,17 @@ class Messages {
                         'title' => null,
                         'description' => $description,
                         'media' => $this->getMediaInfo($message),
-                        'preview' => $this->hasMedia($message) ? $this->getMediaUrl($message) . '/preview' : '',
+                        'preview' => [$this->getMediaUrl($message)],
                         'timestamp' => $message->date ?? '',
                     ];
+
+                    if ($groupedMessages = array_reverse($groupedMessages)) {
+                        foreach ($groupedMessages as $media) {
+                            $parsedMessage['preview'][] = $this->getMediaUrl($media);
+                        }
+                        $groupedMessages = [];
+                    }
+                    $parsedMessage['preview'] = array_filter($parsedMessage['preview']);
 
                     $mime = $message->media->document->mime_type ?? '';
                     if (strpos($mime, 'video') !== false) {
@@ -52,12 +69,12 @@ class Messages {
                     if (!empty($message->media->webpage)) {
                         $parsedMessage['webpage'] = [
                             'site_name' => $message->media->webpage->site_name,
-                            'title' => $message->media->webpage->title,
+                            'title' => $message->media->webpage->title ?? '',
                             'description' => $message->media->webpage->description,
-                            'preview' => $parsedMessage['preview'],
+                            'preview' => reset($parsedMessage['preview']) ?: [],
                             'url' => $message->media->webpage->url,
                         ];
-                        $parsedMessage['preview'] = '';
+                        $parsedMessage['preview'] = [];
                     }
 
                     $this->list[$message->id] = $parsedMessage;
@@ -99,6 +116,8 @@ class Messages {
                 'size' => $info->size,
             ];
         }
+
+        return [];
     }
 
     private function hasMedia($message) {
@@ -106,8 +125,12 @@ class Messages {
             empty($message->media) ||
             !in_array($message->media->{'_'}, static::MEDIA_TYPES, true) ||
             (
-                isset($message->media->photo) &&
+                property_exists($message->media, 'photo') &&
                 empty($message->media->photo)
+            ) ||
+            (
+                !empty($message->media->webpage) &&
+                empty($message->media->webpage->photo)
             )
         ) {
             return false;
