@@ -74,11 +74,15 @@ class RSS {
                         $description .= '<br/><br/>';
                     }
                     $description .= "<blockquote cite=\"{$item['webpage']['url']}\">";
-                    $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
+                    if ($item['webpage']['site_name']) {
+                        $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
+                    }
                     if ($item['webpage']['title']) {
                         $description .= "<b>{$item['webpage']['title']}</b></br>";
                     }
-                    $description .= "{$item['webpage']['description']}</br>";
+                    if ($item['webpage']['description']) {
+                        $description .= "{$item['webpage']['description']}</br>";
+                    }
                     if ($item['webpage']['preview']) {
                         $description .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
                     }

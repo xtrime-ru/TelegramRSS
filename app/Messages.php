@@ -68,9 +68,9 @@ class Messages {
 
                     if (!empty($message->media->webpage)) {
                         $parsedMessage['webpage'] = [
-                            'site_name' => $message->media->webpage->site_name,
+                            'site_name' => $message->media->webpage->site_name ?? '',
                             'title' => $message->media->webpage->title ?? '',
-                            'description' => $message->media->webpage->description,
+                            'description' => $message->media->webpage->description ?? '',
                             'preview' => reset($parsedMessage['preview']) ?: [],
                             'url' => $message->media->webpage->url,
                         ];
