@@ -74,22 +74,27 @@ class RSS {
                         $description .= '<br/><br/>';
                     }
 
-                    $cite  = $item['webpage']['url'] ? "cite=\"{$item['webpage']['url']}\"" : '';
-                    $description .= "<blockquote {$cite}>";
-
+                    $webPagePreview = '';
                     if ($item['webpage']['site_name']) {
-                        $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
+                        $webPagePreview .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
                     }
                     if ($item['webpage']['title']) {
-                        $description .= "<b>{$item['webpage']['title']}</b></br>";
+                        $webPagePreview .= "<b>{$item['webpage']['title']}</b></br>";
                     }
                     if ($item['webpage']['description']) {
-                        $description .= "{$item['webpage']['description']}</br>";
+                        $webPagePreview .= "{$item['webpage']['description']}</br>";
                     }
                     if ($item['webpage']['preview']) {
-                        $description .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
+                        $webPagePreview .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
                     }
-                    $description .= '</blockquote>';
+
+                    if ($webPagePreview) {
+                        $cite  = $item['webpage']['url'] ? "cite=\"{$item['webpage']['url']}\"" : '';
+                        $description .= "<blockquote {$cite}>";
+                        $description .= $webPagePreview;
+                        $description .= '</blockquote>';
+                    }
+
                 }
                 $newItem->addChild('description', htmlspecialchars($description, ENT_XML1));
             }
