@@ -72,7 +72,7 @@ class Messages {
                             'title' => $message->media->webpage->title ?? '',
                             'description' => $message->media->webpage->description ?? '',
                             'preview' => reset($parsedMessage['preview']) ?: [],
-                            'url' => $message->media->webpage->url,
+                            'url' => $message->media->webpage->url ?? '',
                         ];
                         $parsedMessage['preview'] = [];
                     }

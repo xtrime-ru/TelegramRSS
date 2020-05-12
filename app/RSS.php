@@ -73,7 +73,10 @@ class RSS {
                     if ($description) {
                         $description .= '<br/><br/>';
                     }
-                    $description .= "<blockquote cite=\"{$item['webpage']['url']}\">";
+
+                    $cite  = $item['webpage']['url'] ? "cite=\"{$item['webpage']['url']}\"" : '';
+                    $description .= "<blockquote {$cite}>";
+
                     if ($item['webpage']['site_name']) {
                         $description .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
                     }
