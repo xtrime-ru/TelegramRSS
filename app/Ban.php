@@ -62,7 +62,7 @@ class Ban {
      */
     public function updateIp(string $ip, string $url = ''): self {
         if ($this->disableBan()) return $this;
-        if (empty($this->clients[$ip])) {
+        if (empty($this->clients[$ip]) && empty($this->ipBlacklist[$ip])) {
             $this->addIp($ip);
         } else {
             if ($this->getBan($ip)) {
