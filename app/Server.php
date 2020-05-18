@@ -2,6 +2,9 @@
 
 namespace TelegramRSS;
 
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+
 class Server {
     private $config = [];
 
@@ -31,7 +34,7 @@ class Server {
 
         $http_server->on(
             'request',
-            function (\Swoole\Http\Request $request, \Swoole\Http\Response $response) use ($client, $ban) {
+            static function (Request $request, Response $response) use ($client, $ban) {
                 //На каждый запрос должны создаваться новые экземпляры классов парсера и коллбеков,
                 //иначе их данные будут в области видимости всех запросов.
 

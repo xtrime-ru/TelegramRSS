@@ -19,6 +19,7 @@ class Controller {
         'page' => 1,
         'message' => 0,
         'preview' => false,
+        'url' => '',
     ];
 
     private $responseList = [
@@ -78,13 +79,6 @@ class Controller {
         Client $client,
         Ban $ban
     ) {
-        Log::getInstance()->add([
-            'remote_addr' => $request->header['remote_addr'] ?? $request->server['x-forwarded-for'] ?? null,
-            'user-agent' => $request->header['user-agent'] ?? null,
-            'request_uri' => $request->server['request_uri'] ?? $request->server['path_info'] ?? null,
-            'post' => $request->post,
-            'get' => $request->get,
-        ]);
         //Parse request and generate response
 
         $this
@@ -105,6 +99,8 @@ class Controller {
             $response->end($this->response['data']);
         }
 
+        $response->close();
+
     }
 
     /**
@@ -113,7 +109,23 @@ class Controller {
      */
     private function route(Request $request): self {
         //nginx proxy pass ?? custom header ?? default value
-        $this->request['ip'] = $request->header['x-real-ip'] ?? $request->header['remote_addr'] ?? $request->server['remote_addr'];
+        $this->request['ip'] = $request->header['x-real-ip']
+            ??
+            $request->header['remote_addr']
+            ??
+            $request->server['x-forwarded-for']
+            ??
+            $request->server['remote_addr']
+        ;
+        $this->request['url'] = $request->server['request_uri'] ?? $request->server['path_info'] ?? '';
+
+        Log::getInstance()->add([
+            'remote_addr' => $this->request['ip'],
+            'user-agent' => $request->header['user-agent'] ?? null,
+            'request_uri' => $this->request['url'],
+            'post' => $request->post,
+            'get' => $request->get,
+        ]);
 
         $path = array_values(array_filter(explode('/', $request->server['request_uri'])));
         $type = $path[0] ?? '';
@@ -153,17 +165,22 @@ class Controller {
     private function validate(Ban $ban = null) {
 
         if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
+            $this->response['code'] = 404;
             $this->response['errors'][] = "WRONG NAME";
         }
 
         if (preg_match('/bot$/i', $this->request['peer'])) {
+            $this->response['code'] = 403;
             $this->response['errors'][] = "BOTS NOT ALLOWED";
         }
 
         if ($ban && $this->request['peer']) {
-            $timeLeft = $ban->updateIp($this->request['ip'])->timeLeft($this->request['ip']);
-            if ($timeLeft) {
-                $this->response['errors'][] = "TOO MANY REQUEST / ERRORS. TIME TO UNLOCK ACCESS: {$timeLeft}";
+            $banInfo = $ban->updateIp($this->request['ip'], $this->request['url'])->getBan($this->request['ip']);
+            if (!empty($banInfo)) {
+                $this->response['code'] = 400;
+                $this->response['errors'][] = "Error: {$banInfo['reason']}";
+                $this->response['errors'][] = "Time to unlock access: {$banInfo['timeLeft']}";
+                $this->response['errors'][] = "Url: {$banInfo['url']}";
             }
         }
 
@@ -172,6 +189,8 @@ class Controller {
 
     /**
      * @param Client $client
+     * @param Ban $ban
+     *
      * @return Controller
      */
     private function generateResponse(Client $client, Ban $ban): self {
@@ -195,7 +214,7 @@ class Controller {
                     $info->type !== 'channel' &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
-                    throw new UnexpectedValueException('This is not a public channel');
+                    throw new UnexpectedValueException('This is not a public channel', 403);
                 }
 
                 if ($this->request['preview']) {
@@ -218,19 +237,17 @@ class Controller {
                     $this->response['data']->_ !== 'messages.channelMessages' &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
-                    throw new UnexpectedValueException('This is not a public channel');
+                    throw new UnexpectedValueException('This is not a public channel', 403);
                 }
 
             }
 
         } catch (Exception $e) {
-            $this->response['errors'][] = [
-                'code' => $e->getCode(),
-                'message' => $e->getMessage(),
-            ];
+            $this->response['code'] = $e->getCode() ?: 400;
+            $this->response['errors'][] = $e->getMessage();
 
             if ($ban) {
-                $ban->addBan($this->request['ip']);
+                $ban->addBan($this->request['ip'], $e->getMessage(), $this->request['url']);
             }
         }
 
@@ -244,7 +261,11 @@ class Controller {
         }
 
         $this->response['type'] = 'json';
-        $this->response['code'] = 400;
+        $errorCode = $this->response['code'];
+        if ($errorCode < 300 || $errorCode >= 600) {
+            $errorCode = 400;
+        }
+        $this->response['code'] = $errorCode;
         $this->response['data'] = [
             'errors' => $this->response['errors'],
         ];
@@ -270,7 +291,11 @@ class Controller {
                 case 'json':
                     $this->response['data'] = json_encode(
                         $this->response['data'],
-                        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                        JSON_THROW_ON_ERROR |
+                        JSON_PRETTY_PRINT |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_UNESCAPED_UNICODE |
+                        JSON_INVALID_UTF8_SUBSTITUTE
                     );
                     break;
                 case 'rss':
@@ -298,10 +323,8 @@ class Controller {
                 $this->response['headers'] = $this->responseList[$this->response['type']]['headers'];
             }
         } catch (Throwable $e) {
-            $this->response['errors'][] = [
-                'code' => $e->getCode(),
-                'message' => $e->getMessage(),
-            ];
+            $this->response['code'] = $e->getCode();
+            $this->response['errors'][] = $e->getMessage();
             if ($firstRun) {
                 $this->checkErrors()->encodeResponse($client, false);
             }

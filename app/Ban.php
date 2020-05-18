@@ -5,10 +5,10 @@ namespace TelegramRSS;
 
 class Ban {
 
-    private $clients;
-    private $clientsCount = 0;
-    private $rpmLimit;
-    private $ipBlacklist;
+    private array $clients;
+    private int $clientsCount = 0;
+    private int $rpmLimit;
+    private array $ipBlacklist;
     private const BAN_DURATION_STEPS = [
         1 * 60,
         5 * 60,
@@ -28,8 +28,8 @@ class Ban {
         $this->ipBlacklist = array_fill_keys(Config::getInstance()->get('access.ip_blacklist'), null);
     }
 
-    private function disableBan() {
-        return (bool)$this->rpmLimit === 0;
+    private function disableBan():bool {
+        return $this->rpmLimit === 0;
     }
 
     /**
@@ -45,6 +45,8 @@ class Ban {
             'rpm' => 0,
             'last_ban_duration' => 0,
             'ban_timestamp' => 0,
+            'reason' => '',
+            'url' => '',
         ];
         ++$this->clientsCount;
         return $this;
@@ -52,15 +54,18 @@ class Ban {
 
     /**
      * Пересчитывает данные по указанному ip
-     * @param $ip
+     *
+     * @param string $ip
+     * @param string $url
+     *
      * @return Ban
      */
-    public function updateIp($ip): self {
+    public function updateIp(string $ip, string $url = ''): self {
         if ($this->disableBan()) return $this;
         if (empty($this->clients[$ip])) {
             $this->addIp($ip);
         } else {
-            if ($this->timeLeft($ip)) {
+            if ($this->getBan($ip)) {
                 //не обновляем если ip в бане
                 return $this;
             }
@@ -88,7 +93,7 @@ class Ban {
         }
 
         if ($info['rpm'] > $this->rpmLimit) {
-            $this->addBan($ip);
+            $this->addBan($ip, 'Too many requests', $url);
         }
 
         return $this;
@@ -96,10 +101,15 @@ class Ban {
 
     /**
      * Банит по ip
-     * @param $ip
+     *
+     * @param string $ip
+     * @param string $reason
+     *
+     * @param string $url
+     *
      * @return Ban
      */
-    public function addBan($ip): self {
+    public function addBan(string $ip, string $reason = '', string $url = ''): self {
         if ($this->disableBan()) return $this;
         $info = &$this->clients[$ip];
         foreach (static::BAN_DURATION_STEPS as $duration) {
@@ -109,27 +119,41 @@ class Ban {
             }
         }
         $info['ban_timestamp'] = time() + $info['last_ban_duration'];
+        $info['reason'] = $reason;
+        $info['url'] = $url;
 
         return $this;
     }
 
     /**
-     * Возвращает остаток времени бана в виде форматированной строки или null, если бана нет.
+     * Возвращает массив с данными о бане.
      * @param $ip
-     * @return string|null
+     * @return array|null
      */
-    public function timeLeft($ip) {
+    public function getBan($ip): ?array {
         $status = $this->clients[$ip] ?? [];
         if (!$status) {
-            return null;
+            return [];
         }
+        $timeLeftHuman = '';
+        $reason = $status['reason'];
         if (array_key_exists($ip, $this->ipBlacklist)) {
-            return '9999:00:00';
+            $reason = 'Blacklist';
+            $timeLeftHuman = '9999:00:00';
         }
         $timeLeft = $status['ban_timestamp'] - time();
         if ($timeLeft > 0) {
-            return gmdate('H:i:s', $timeLeft);
+            $timeLeftHuman = gmdate('H:i:s', $timeLeft);
         }
+
+        if ($timeLeftHuman) {
+            return [
+                'timeLeft' => $timeLeftHuman,
+                'reason' => $reason,
+                'url' => $status['url'],
+            ];
+        }
+
         return null;
     }
 
