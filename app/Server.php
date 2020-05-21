@@ -31,15 +31,19 @@ class Server {
         $http_server->set($this->config['options']);
 
         $ban = new Ban();
-
+		$counter = 0;
         $http_server->on(
             'request',
-            static function (Request $request, Response $response) use ($client, $ban) {
+            static function (Request $request, Response $response) use ($client, $ban, &$counter) {
                 //На каждый запрос должны создаваться новые экземпляры классов парсера и коллбеков,
                 //иначе их данные будут в области видимости всех запросов.
 
                 //Телеграм клиент инициализируется 1 раз и используется во всех запросах.
                 new Controller($request, $response, $client, $ban);
+                if (++$counter % 100 === 0) {
+                	gc_collect_cycles();
+					$counter = 0;
+				}
             }
         );
         echo 'Server started' . PHP_EOL;
