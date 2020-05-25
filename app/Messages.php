@@ -50,13 +50,22 @@ class Messages {
                         'title' => null,
                         'description' => $description,
                         'media' => $info,
-                        'preview' => [$this->getMediaUrl($message, $info)],
+                        'preview' => [
+                            [
+                                'href' => $info->url ?? null,
+                                'image' => $this->getMediaUrl($message, $info, true),
+                            ]
+                        ],
                         'timestamp' => $message->date ?? '',
                     ];
 
                     if ($groupedMessages = array_reverse($groupedMessages)) {
                         foreach ($groupedMessages as $media) {
-                            $parsedMessage['preview'][] = $this->getMediaUrl($media);
+                            $info = $this->getMediaInfo($media);
+                            $parsedMessage['preview'][] = [
+                                'href' => $info->url ?? null,
+                                'image' => $this->getMediaUrl($message, $info, true),
+                            ];
                         }
                         $groupedMessages = [];
                     }
@@ -100,9 +109,9 @@ class Messages {
         return $this->channelUrl . $messageId;
     }
 
-    private function getMediaInfo($message) {
+    private function getMediaInfo($message): ?\stdClass {
         if (!$this->hasMedia($message)) {
-            return [];
+            return null;
         }
         if (!empty($message->media->webpage->photo)) {
             $media = $message->media->webpage->photo;
@@ -111,15 +120,11 @@ class Messages {
         }
         $info = $this->client->getMediaInfo($media);
         if (!empty($info->size) && !empty($info->mime)) {
-            return [
-                'url' => $this->getMediaUrl($message, $info),
-                'mime' => $info->mime,
-                'size' => $info->size,
-
-            ];
+            $info->url = $this->getMediaUrl($message, $info, false);
+            return $info;
         }
 
-        return [];
+        return null;
     }
 
     private function hasMedia($message) {
@@ -141,16 +146,17 @@ class Messages {
         return true;
     }
 
-    private function getMediaUrl($message, $info = null) {
+    private function getMediaUrl(\stdClass $message, ?\stdClass $info, bool $preview = false) {
         if (!$this->hasMedia($message)) {
-            return false;
+            return null;
         }
 
         $url = Config::getInstance()->get('url');
         $url = "{$url}/media/{$this->username}/{$message->id}";
 
-        $info = $info ?? $this->getMediaInfo($message);
-        if (!empty($info->name) && !empty($info->ext)) {
+        if ($preview) {
+            $url .= '/preview/thumb.jpeg';
+        } elseif (!empty($info->name) && !empty($info->ext)) {
             $filename = mb_substr(trim($info->name), 0, 50);
             $filename = urlencode("{$filename}{$info->ext}");
             $url .= "/$filename";

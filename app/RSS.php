@@ -61,10 +61,13 @@ class RSS {
             if (!empty($item['description']) || !empty($item['preview']) || !empty($item['webpage'])) {
                 $description = '';
                 foreach ($item['preview'] as $url) {
-                    $description .= "<a href=\"{$url}\" target=\"_blank\" rel=\"nofollow\">";
-                    $description .= "<img src=\"{$url}/preview\" style=\"max-width:100%\"/>";
-                    $description .= '</a>';
-                    $description .= '<br/>';
+                    if ($url['href'] && $url['image']) {
+                        $description .= "<a href=\"{$url['href']}\" target=\"_blank\" rel=\"nofollow\">";
+                        $description .= "<img src=\"{$url['image']}\" style=\"max-width:100%\"/>";
+                        $description .= '</a>';
+                        $description .= '<br/>';
+                    }
+
                 }
                 $description .= '<br/>';
 
@@ -103,12 +106,12 @@ class RSS {
                 $newItem->addChild('link', $item['url']);
                 $newItem->addChild('guid', $item['url']);
             }
-            if (!empty($item['media'])) {
+            if (!empty($item['media']->url)) {
                 $media = $item['media'];
                 $enclosure = $newItem->addChild('enclosure');
-                $enclosure['url'] = $media['url'];
-                $enclosure['type'] = $media['mime'];
-                $enclosure['length'] = $media['size'];
+                $enclosure['url'] = $media->url;
+                $enclosure['type'] = $media->mime;
+                $enclosure['length'] = $media->size;
                 unset($enclosure);
             }
         }
