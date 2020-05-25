@@ -62,14 +62,16 @@ class Messages {
                     if ($groupedMessages = array_reverse($groupedMessages)) {
                         foreach ($groupedMessages as $media) {
                             $info = $this->getMediaInfo($media);
-                            $parsedMessage['preview'][] = [
+                            $preview = [
                                 'href' => $info->url ?? null,
                                 'image' => $this->getMediaUrl($message, $info, true),
                             ];
+                            if ($preview['href'] && $preview['image']) {
+                                $parsedMessage['preview'][] = $preview;
+                            }
                         }
                         $groupedMessages = [];
                     }
-                    $parsedMessage['preview'] = array_filter($parsedMessage['preview']);
 
                     $mime = $message->media->document->mime_type ?? '';
                     if (strpos($mime, 'video') !== false) {
@@ -78,11 +80,11 @@ class Messages {
 
                     if (!empty($message->media->webpage)) {
                         $parsedMessage['webpage'] = [
-                            'site_name' => $message->media->webpage->site_name ?? '',
-                            'title' => $message->media->webpage->title ?? '',
-                            'description' => $message->media->webpage->description ?? '',
-                            'preview' => reset($parsedMessage['preview']) ?: [],
-                            'url' => $message->media->webpage->url ?? '',
+                            'site_name' => $message->media->webpage->site_name ?? null,
+                            'title' => $message->media->webpage->title ?? null,
+                            'description' => $message->media->webpage->description ?? null,
+                            'preview' => reset($parsedMessage['preview'])['image'] ?? null,
+                            'url' => $message->media->webpage->url ?? null,
                         ];
                         $parsedMessage['preview'] = [];
                     }
