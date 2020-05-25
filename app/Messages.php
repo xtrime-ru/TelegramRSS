@@ -44,12 +44,13 @@ class Messages {
                 }
                 $description = $message->message ?? '';
                 if ($description || $this->hasMedia($message)) {
+                    $info = $this->getMediaInfo($message);
                     $parsedMessage = [
                         'url' => $this->getMessageUrl($message->id),
                         'title' => null,
                         'description' => $description,
-                        'media' => $this->getMediaInfo($message),
-                        'preview' => [$this->getMediaUrl($message)],
+                        'media' => $info,
+                        'preview' => [$this->getMediaUrl($message, $info)],
                         'timestamp' => $message->date ?? '',
                     ];
 
@@ -111,9 +112,10 @@ class Messages {
         $info = $this->client->getMediaInfo($media);
         if (!empty($info->size) && !empty($info->mime)) {
             return [
-                'url' => $this->getMediaUrl($message),
+                'url' => $this->getMediaUrl($message, $info),
                 'mime' => $info->mime,
                 'size' => $info->size,
+
             ];
         }
 
@@ -139,13 +141,21 @@ class Messages {
         return true;
     }
 
-    private function getMediaUrl($message) {
+    private function getMediaUrl($message, $info = null) {
         if (!$this->hasMedia($message)) {
             return false;
         }
-        $url = Config::getInstance()->get('url');
 
-        return "{$url}/media/{$this->username}/{$message->id}";
+        $url = Config::getInstance()->get('url');
+        $url = "{$url}/media/{$this->username}/{$message->id}";
+
+        $info = $info ?? $this->getMediaInfo($message);
+        if (!empty($info->name) && !empty($info->ext)) {
+            $filename = mb_substr(trim($info->name), 0, 50);
+            $filename = urlencode("{$filename}{$info->ext}");
+            $url .= "/$filename";
+        }
+        return $url;
     }
 
     /**
