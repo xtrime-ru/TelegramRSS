@@ -26,8 +26,19 @@ class Messages {
      */
     public function __construct($telegramResponse, Client $client) {
         $this->telegramResponse = $telegramResponse;
+        $this->setUsername();
         $this->client = $client;
         $this->parseMessages();
+    }
+
+    private function setUsername() {
+        if (!$this->channelUrl) {
+            $this->username = $this->telegramResponse->chats[0]->username ?? '';
+            if (!$this->username) {
+                return null;
+            }
+            $this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
+        }
     }
 
     private function parseMessages(): self {
@@ -101,13 +112,6 @@ class Messages {
      * @return string|null
      */
     private function getMessageUrl($messageId = '') {
-        if (!$this->channelUrl) {
-            $this->username = $this->telegramResponse->chats[0]->username ?? '';
-            if (!$this->username) {
-                return null;
-            }
-            $this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
-        }
         return $this->channelUrl . $messageId;
     }
 
@@ -154,7 +158,7 @@ class Messages {
         }
 
         $url = Config::getInstance()->get('url');
-        $url = "{$url}/media/{$this->username}/{$message->id}";
+        $url .= "/media/{$this->username}/{$message->id}";
 
         if ($preview) {
             $url .= '/preview/thumb.jpeg';
