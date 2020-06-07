@@ -1,7 +1,5 @@
 <?php
 
-require_once __DIR__ . '/bootstrap.php';
-
 if (PHP_SAPI !== 'cli') {
     throw new \RuntimeException('Start in CLI');
 }
@@ -11,6 +9,7 @@ $longopts = [
     'server-port::',  // порт сервера, необязательное значение
     'client-address::',  // ip телеграм-клиента, необязательное значение
     'client-port::',  // порт телеграм-клиента, необязательное значение
+    'docker::', //сгенерировать docker-совместимый .env
     'help', //нужна ли справка?
 ];
 $options = getopt('', $longopts);
@@ -19,6 +18,7 @@ $options = [
     'server-port' => (int)($options['server-port'] ?? 0),
     'client-address' => $options['client-address'] ?? '',
     'client-port' => (int)($options['client-port'] ?? 0),
+    'docker' => isset($options['docker']),
     'help' => isset($options['help']),
 ];
 
@@ -47,6 +47,8 @@ Example:
     echo $help;
     exit;
 }
+
+require_once __DIR__ . '/bootstrap.php';
 
 $client = new \TelegramRSS\Client($options['client-address'], $options['client-port']);
 new \TelegramRSS\Server($client, $options['server-address'], $options['server-port']);

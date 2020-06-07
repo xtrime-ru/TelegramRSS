@@ -1,0 +1,22 @@
+version: '3'
+services:
+  telegram-rss:
+    build: ./
+    image: xtrime/telegram-rss:latest
+    container_name: telegram-rss
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9504:9504"
+    volumes:
+      - ./:/app-host-link
+    entrypoint: php server.php --docker
+    working_dir: /app-host-link
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1024k"
+        max-file: "2"
+networks:
+  default:
+    external:
+      name: telegram-api-server
