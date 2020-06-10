@@ -4,7 +4,7 @@ COPY . /app
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install git -y \
+    && apt-get install git zip -y \
     && PHP_OPENSSL=yes pecl install swoole \
     && docker-php-ext-enable swoole \
     && docker-php-source delete \

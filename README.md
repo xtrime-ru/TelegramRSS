@@ -20,7 +20,7 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 1. Clone this project: `git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS`
 
 Docker: 
-1. `docker pull docker pull xtrime/telegram-rss`
+1. `docker pull xtrime/telegram-rss`
 1. `docker-compose up -d`
 
 Manual:
