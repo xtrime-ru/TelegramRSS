@@ -14,14 +14,8 @@
         "ext-swoole": ">=4.1"
     },
     "require-dev": {
-        "swoole/ide-helper": "dev-master"
+        "swoole/ide-helper": "^4"
     },
-    "repositories": [
-        {
-            "type": "git",
-            "url": "https://github.com/swoole/ide-helper.git"
-        }
-    ],
     "authors": [
         {
             "name": "Alexander Pankratov",

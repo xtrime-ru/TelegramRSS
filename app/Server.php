@@ -30,16 +30,16 @@ class Server {
 
         $http_server->set($this->config['options']);
 
-        $ban = new Ban();
+        $accessControl = new AccessControl\AccessControl();
 		$counter = 0;
         $http_server->on(
             'request',
-            static function (Request $request, Response $response) use ($client, $ban, &$counter) {
+            static function (Request $request, Response $response) use ($client, $accessControl, &$counter) {
                 //На каждый запрос должны создаваться новые экземпляры классов парсера и коллбеков,
                 //иначе их данные будут в области видимости всех запросов.
 
                 //Телеграм клиент инициализируется 1 раз и используется во всех запросах.
-                new Controller($request, $response, $client, $ban);
+                new Controller($request, $response, $client, $accessControl);
                 if (++$counter % 100 === 0) {
                 	gc_collect_cycles();
 					$counter = 0;

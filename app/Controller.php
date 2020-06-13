@@ -5,14 +5,15 @@ namespace TelegramRSS;
 use Exception;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
+use TelegramRSS\AccessControl\AccessControl;
+use TelegramRSS\AccessControl\User;
 use Throwable;
 use UnexpectedValueException;
 
 class Controller {
     private const POSTS_MAX_LIMIT = 100;
 
-    /** @var array */
-    private $request = [
+    private array $request = [
         'ip' => '',
         'peer' => '',
         'limit' => 10,
@@ -22,7 +23,7 @@ class Controller {
         'url' => '',
     ];
 
-    private $responseList = [
+    private array $responseList = [
         'html' => [
             'type' => 'html',
             'headers' => [
@@ -54,8 +55,7 @@ class Controller {
         ],
     ];
 
-    /** @var array */
-    private $response = [
+    private array $response = [
         'errors' => [],
         'type' => '',
         'headers' => [],
@@ -64,27 +64,32 @@ class Controller {
         'file' => null,
     ];
 
-    private $indexPage = __DIR__ . '/../index.html';
+    private AccessControl $accessControl;
+    private User $user;
+
+    private string $indexPage = __DIR__ . '/../index.html';
 
     /**
      * Controller constructor.
+     *
      * @param Request $request
      * @param Response $response
      * @param Client $client
-     * @param Ban $ban
+     * @param AccessControl $accessControl
      */
     public function __construct(
         Request $request,
         Response $response,
         Client $client,
-        Ban $ban
+        AccessControl $accessControl
     ) {
         //Parse request and generate response
+        $this->accessControl = $accessControl;
 
         $this
             ->route($request)
-            ->validate($ban)
-            ->generateResponse($client, $ban)
+            ->validate()
+            ->generateResponse($client)
             ->checkErrors()
             ->encodeResponse($client)
         ;
@@ -118,6 +123,7 @@ class Controller {
             $request->server['remote_addr']
         ;
         $this->request['url'] = $request->server['request_uri'] ?? $request->server['path_info'] ?? '';
+        $this->user = $this->accessControl->getOrCreateUser($this->request['ip']);
 
         Log::getInstance()->add([
             'remote_addr' => $this->request['ip'],
@@ -125,6 +131,10 @@ class Controller {
             'request_uri' => $this->request['url'],
             'post' => $request->post,
             'get' => $request->get,
+            'rpm' => $this->user->rpm,
+            'rpm_limit' => $this->user->rpmLimit,
+            'errors' => \count($this->user->errors),
+            'errors_limit' => $this->user->errorsLimit,
         ]);
 
         $path = array_values(array_filter(explode('/', $request->server['request_uri'])));
@@ -162,8 +172,8 @@ class Controller {
         return $this;
     }
 
-    private function validate(Ban $ban = null) {
-
+    private function validate(): self
+    {
         if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
             $this->response['code'] = 404;
             $this->response['errors'][] = "WRONG NAME";
@@ -174,13 +184,15 @@ class Controller {
             $this->response['errors'][] = "BOTS NOT ALLOWED";
         }
 
-        if ($ban && $this->request['peer']) {
-            $banInfo = $ban->updateIp($this->request['ip'], $this->request['url'])->getBan($this->request['ip']);
-            if (!empty($banInfo)) {
+        if ($this->request['peer']) {
+            $this->user->addRequest($this->request['url']);
+
+            if ($this->user->isBanned()) {
                 $this->response['code'] = 400;
-                $this->response['errors'][] = "Error: {$banInfo['reason']}";
-                $this->response['errors'][] = "Time to unlock access: {$banInfo['timeLeft']}";
-                $this->response['errors'][] = "Url: {$banInfo['url']}";
+                if ($timeLeft = $this->user->getBanDuration()) {
+                    $this->response['errors'][] = "Time to unlock access: {$timeLeft}";
+                }
+                $this->response['errors'] = array_merge($this->response['errors'], $this->user->errors);
             }
         }
 
@@ -189,11 +201,11 @@ class Controller {
 
     /**
      * @param Client $client
-     * @param Ban $ban
      *
      * @return Controller
      */
-    private function generateResponse(Client $client, Ban $ban): self {
+    private function generateResponse(Client $client): self
+    {
 
         if ($this->response['errors']) {
             return $this;
@@ -246,16 +258,14 @@ class Controller {
             $this->response['code'] = $e->getCode() ?: 400;
             $this->response['errors'][] = $e->getMessage();
 
-            if ($ban) {
-                $ban->addBan($this->request['ip'], $e->getMessage(), $this->request['url']);
-            }
+            $this->user->addError($e->getMessage(), $this->request['url']);
         }
 
         return $this;
     }
 
-    private function checkErrors(): self {
-
+    private function checkErrors(): self
+    {
         if (!$this->response['errors']) {
             return $this;
         }
@@ -282,7 +292,8 @@ class Controller {
      * @param bool $firstRun
      * @return Controller
      */
-    public function encodeResponse(Client $client, $firstRun = true): self {
+    public function encodeResponse(Client $client, bool $firstRun = true): self
+    {
         try {
             switch ($this->response['type']) {
                 case 'html':
@@ -329,7 +340,6 @@ class Controller {
                 $this->checkErrors()->encodeResponse($client, false);
             }
         }
-
 
         return $this;
     }

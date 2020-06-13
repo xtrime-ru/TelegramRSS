@@ -11,7 +11,7 @@ class Log {
      * @var self
      */
     private static $instance;
-    private $needLog = true;
+    private bool $echoLog = true;
     private $dir;
     private $file;
 
@@ -31,8 +31,8 @@ class Log {
     private function __construct() {
         $this->dir = Config::getInstance()->get('log.dir');
         $this->file = Config::getInstance()->get('log.file');
-        if (!$this->file) {
-            $this->needLog = false;
+        if ($this->file) {
+            $this->echoLog = false;
         }
         $this->createDirIfNotExists();
     }
@@ -54,9 +54,6 @@ class Log {
      * @return Log
      */
     public function add($input): self {
-        if (!$this->needLog) {
-            return $this;
-        }
         $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1];
         $result = '[' . date('Y-m-d H:i:s') . '] ';
         $result .= "{$caller['class']}{$caller['type']}{$caller['function']}: ";
@@ -70,7 +67,7 @@ class Log {
                 break;
         }
         $result .= PHP_EOL;
-        $this->appendToFile($result);
+        $this->send($result);
         return $this;
     }
 
@@ -78,19 +75,23 @@ class Log {
      * @param string $text
      * @return Log
      */
-    private function appendToFile(string $text): self {
-        if (!$this->needLog) {
-            return $this;
+    private function send(string $text): self
+    {
+        if ($this->echoLog) {
+            echo $text;
+        } else {
+            Coroutine::writeFile("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND | LOCK_EX);
         }
-        Coroutine::writeFile("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND | LOCK_EX);
+
         return $this;
     }
 
     /**
      * @return Log
      */
-    private function createDirIfNotExists(): self {
-        if (!$this->needLog) {
+    private function createDirIfNotExists(): self
+    {
+        if ($this->echoLog) {
             return $this;
         }
         if (!is_dir($this->dir)) {
@@ -104,7 +105,8 @@ class Log {
     /**
      * @return string
      */
-    private function getFilename(): string {
+    private function getFilename(): string
+    {
         preg_match_all('/%([a-zA-Z]+)/', $this->file, $dateComponents);
         $fileName = $this->file;
         if (count($dateComponents) === 2) {

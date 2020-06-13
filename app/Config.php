@@ -5,15 +5,12 @@ namespace TelegramRSS;
 
 
 class Config {
-    /**
-     * @var self
-     */
-    private static $instance;
-    private $config;
+    private static Config $instance;
+    private array $config;
 
-
-    public static function getInstance() {
-        if (null === static::$instance) {
+    public static function getInstance(): Config
+    {
+        if (empty(static::$instance)) {
             static::$instance = new static();
         }
 
@@ -24,20 +21,23 @@ class Config {
      * is not allowed to call from outside to prevent from creating multiple instances,
      * to use the singleton, you have to obtain the instance from Singleton::getInstance() instead
      */
-    private function __construct() {
+    private function __construct()
+    {
         $this->config = include __DIR__ . '/../config.php';
     }
 
     /**
      * prevent the instance from being cloned (which would create a second instance of it)
      */
-    private function __clone() {
+    private function __clone()
+    {
     }
 
     /**
      * prevent from being unserialized (which would create a second instance of it)
      */
-    private function __wakeup() {
+    private function __wakeup()
+    {
     }
 
     /**
@@ -45,18 +45,20 @@ class Config {
      * @param null $default
      * @return mixed|null
      */
-    public function get($key = '', $default = null) {
+    public function get($key = '', $default = null)
+    {
         return $this->findByKey($key) ?? $default;
     }
 
-    private function findByKey($key) {
-        $key = (string)$key;
+    private function findByKey($key)
+    {
+        $key = (string) $key;
         $path = explode('.', $key);
 
         $value = &$this->config;
         foreach ($path as $pathKey) {
             if (!is_array($value) || !array_key_exists($pathKey, $value)) {
-                return;
+                return null;
             }
             $value = &$value[$pathKey];
         }

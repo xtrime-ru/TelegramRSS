@@ -29,4 +29,6 @@ if (!getenv('SWOOLE_SERVER_ADDRESS')) {
     Dotenv\Dotenv::createImmutable($root, $envPath)->load();
 }
 
-date_default_timezone_set(getenv('TIMEZONE') ?: 'UTC');
+if ($timezone = getenv('TIMEZONE')) {
+    date_default_timezone_set($timezone);
+}
