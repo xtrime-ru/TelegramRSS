@@ -1,7 +1,6 @@
 version: '3'
 services:
   telegram-rss:
-    build: ./
     image: xtrime/telegram-rss:latest
     container_name: telegram-rss
     restart: unless-stopped

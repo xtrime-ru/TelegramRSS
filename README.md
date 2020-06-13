@@ -18,18 +18,23 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
  
 1. Install and start [Telegram Api Server](https://github.com/xtrime-ru/TelegramApiServer)
 1. Clone this project: `git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS`
-
-Docker: 
-1. `docker pull xtrime/telegram-rss`
-1. `docker-compose up -d`
-
-Manual:
-1. [Install Swoole php extension](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
-1. `composer install -o --no-dev`
+1. Start:
+    * Docker: 
+        1. `docker-compose up -d`
+  
+    * Manual:
+        1. [Install Swoole php extension](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
+        1. `composer install -o --no-dev`
+        1. `php server.php`
    
 ## Setup
 1. Edit `.env` or `.env.docker` if needed. 
 1. Restart RSS server.
+    * Docker: 
+        1. `docker-compose restart`
+    * Manual:
+        1. ctrl + c
+        1. `php server.php`
 1. [Run in background](https://github.com/xtrime-ru/TelegramApiServer#run-in-background)
 1. Example of Nginx config 
     ```
