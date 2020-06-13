@@ -29,6 +29,10 @@ if (!getenv('SWOOLE_SERVER_ADDRESS')) {
     Dotenv\Dotenv::createImmutable($root, $envPath)->load();
 }
 
+if ($memoryLimit = getenv('MEMORY_LIMIT')) {
+    ini_set('memory_limit', $memoryLimit);
+}
+
 if ($timezone = getenv('TIMEZONE')) {
     date_default_timezone_set($timezone);
 }
