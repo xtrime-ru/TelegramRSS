@@ -17,7 +17,7 @@ class RSS {
      */
     public function __construct(array $messages, string $peer) {
         $url = Config::getInstance()->get('url');
-        $selfLink = "$url/rss/{$peer}";
+        $selfLink = "$url/rss/" . urlencode($peer);
 
         $this->title .= ": $peer";
 

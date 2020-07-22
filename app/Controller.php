@@ -175,7 +175,7 @@ class Controller {
     private function validate(): self
     {
         if (Config::getInstance()->get('access.only_public_channels')) {
-            if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
+            if (preg_match('/[^\w\-@]/', $this->request['peer'])) {
                 $this->response['code'] = 404;
                 $this->response['errors'][] = "WRONG NAME";
             }
@@ -223,10 +223,9 @@ class Controller {
                 ];
 
                 $info = $client->getInfo($this->request['peer']);
-                $type = $info->Chat->_ ?? null;
 
                 if (
-                    $type !== 'channel' &&
+                    !in_array($info->type, ['channel', 'supergroup']) &&
                     Config::getInstance()->get('access.only_public_channels')
                 ) {
                     throw new UnexpectedValueException('This is not a public channel', 403);

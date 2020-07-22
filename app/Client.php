@@ -75,6 +75,10 @@ class Client
         return $this->get('getInfo', $peer);
     }
 
+    public function getId($chat) {
+        return $this->get('getId', [$chat]);
+    }
+
     /**
      * @param string $method
      * @param mixed $parameters

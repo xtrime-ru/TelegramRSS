@@ -26,14 +26,15 @@ class Messages {
      */
     public function __construct($telegramResponse, Client $client) {
         $this->telegramResponse = $telegramResponse;
-        $this->setUsername();
         $this->client = $client;
+        $this->setUsername();
         $this->parseMessages();
     }
 
     private function setUsername() {
         if (!$this->channelUrl) {
-            $this->username = $this->telegramResponse->chats[0]->username ?? '';
+            $chat = $this->telegramResponse->chats[0];
+            $this->username = $chat->username ?? $this->client->getId($chat);
             if (!$this->username) {
                 return null;
             }
