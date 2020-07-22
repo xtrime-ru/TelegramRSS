@@ -174,14 +174,16 @@ class Controller {
 
     private function validate(): self
     {
-        if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
-            $this->response['code'] = 404;
-            $this->response['errors'][] = "WRONG NAME";
-        }
+        if (Config::getInstance()->get('access.only_public_channels')) {
+            if (preg_match('/[^\w\-@#]/', $this->request['peer'])) {
+                $this->response['code'] = 404;
+                $this->response['errors'][] = "WRONG NAME";
+            }
 
-        if (preg_match('/bot$/i', $this->request['peer'])) {
-            $this->response['code'] = 403;
-            $this->response['errors'][] = "BOTS NOT ALLOWED";
+            if (preg_match('/bot$/i', $this->request['peer'])) {
+                $this->response['code'] = 403;
+                $this->response['errors'][] = "BOTS NOT ALLOWED";
+            }
         }
 
         if ($this->request['peer']) {
