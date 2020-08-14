@@ -4,6 +4,7 @@ COPY . /app
 WORKDIR /app
 
 RUN apt-get update \
+    && cp -a docker/php/conf.d/. "$PHP_INI_DIR/conf.d/" \
     && apt-get install git zip -y \
     && PHP_OPENSSL=yes pecl install swoole \
     && docker-php-ext-enable swoole \
