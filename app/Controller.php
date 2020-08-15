@@ -232,7 +232,17 @@ class Controller {
                 }
 
                 if ($this->request['preview']) {
-                    $this->response['data'] = $client->getMediaPreview($data);
+                    try {
+                        $this->response['data'] = $client->getMediaPreview($data);
+                    } catch (\Throwable $e) {
+                        $this->response['type'] = 'file';
+                        $this->response['file'] = ROOT_DIR . '/no-image.jpg';
+                        $this->response['headers'] = [
+                            'Content-Length' => filesize($this->response['file']),
+                            'Content-Type' => 'image/jpeg',
+                        ];
+                        $this->response['code'] = 404;
+                    }
                 } else {
                     $this->response['data'] = $client->getMedia($data);
                 }
@@ -326,7 +336,10 @@ class Controller {
                     $this->response['code'] = 302;
                     break;
                 case 'favicon.ico':
-                    $this->response['file'] = __DIR__ . '/../favicon.ico';
+                    $this->response['file'] = ROOT_DIR . '/favicon.ico';
+                    break;
+                case 'file':
+                    unset($this->response['data']);
                     break;
                 default:
                     $this->response['data'] = 'Unknown response type';

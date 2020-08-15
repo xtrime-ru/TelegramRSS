@@ -12,6 +12,9 @@ if (!class_exists('TelegramRSS')) {
     require_once $root . '/vendor/autoload.php';
     chdir($root);
 }
+
+define('ROOT_DIR', $root);
+
 $envPath = '.env';
 if ($options['docker']) {
     $envPath .= '.docker';
