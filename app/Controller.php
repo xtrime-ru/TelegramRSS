@@ -89,7 +89,7 @@ class Controller {
         $this
             ->route($request)
             ->validate()
-            ->generateResponse($client)
+            ->generateResponse($client, $request)
             ->checkErrors()
             ->encodeResponse($client)
         ;
@@ -154,8 +154,11 @@ class Controller {
         if (array_key_exists($type, $this->responseList)) {
             $this->response['type'] = $this->responseList[$type]['type'];
             $this->request['peer'] = urldecode($path[1]);
-            $this->request['page'] = (int)($path[2] ?? $this->request['page']);
-            $this->request['limit'] = (int)($request->get['limit'] ?? $this->request['limit']) ?: $this->request['limit'];
+
+            $this->request['page'] = (int)($path[2] ?? $request->get['page'] ?? $request->post['page'] ?? $this->request['page']);
+            $this->request['page'] = max(1, $this->request['page']);
+
+            $this->request['limit'] = (int)($request->get['limit'] ?? $request->post['limit'] ?? $this->request['limit']);
             $this->request['limit'] = min($this->request['limit'], static::POSTS_MAX_LIMIT);
         } else {
             $this->response['errors'][] = 'Unknown response format';
@@ -339,7 +342,7 @@ class Controller {
                     $this->response['file'] = ROOT_DIR . '/favicon.ico';
                     break;
                 case 'file':
-                    unset($this->response['data']);
+                    $this->response['data'] = null;
                     break;
                 default:
                     $this->response['data'] = 'Unknown response type';
