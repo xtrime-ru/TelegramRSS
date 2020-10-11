@@ -72,20 +72,21 @@ class Controller {
     /**
      * Controller constructor.
      *
+     * @param AccessControl $accessControl
+     */
+    public function __construct(AccessControl $accessControl)
+    {
+        $this->accessControl = $accessControl;
+    }
+
+    /**
+     * Parse request and generate response
+     *
      * @param Request $request
      * @param Response $response
      * @param Client $client
-     * @param AccessControl $accessControl
      */
-    public function __construct(
-        Request $request,
-        Response $response,
-        Client $client,
-        AccessControl $accessControl
-    ) {
-        //Parse request and generate response
-        $this->accessControl = $accessControl;
-
+    public function process(Request $request, Response $response, Client $client) {
         $this
             ->route($request)
             ->validate()
@@ -105,7 +106,6 @@ class Controller {
         }
 
         $response->close();
-
     }
 
     /**
@@ -123,7 +123,16 @@ class Controller {
             $request->server['remote_addr']
         ;
         $this->request['url'] = $request->server['request_uri'] ?? $request->server['path_info'] ?? '';
-        $this->user = $this->accessControl->getOrCreateUser($this->request['ip']);
+        $path = array_values(array_filter(explode('/', $request->server['request_uri'])));
+        $type = $path[0] ?? '';
+
+        if ($type === 'media') {
+            $accessType = 'media';
+        } else {
+            $accessType = 'default';
+        }
+
+        $this->user = $this->accessControl->getOrCreateUser($this->request['ip'], $accessType);
 
         Log::getInstance()->add([
             'remote_addr' => $this->request['ip'],
@@ -136,9 +145,6 @@ class Controller {
             'errors' => \count($this->user->errors),
             'errors_limit' => $this->user->errorsLimit,
         ]);
-
-        $path = array_values(array_filter(explode('/', $request->server['request_uri'])));
-        $type = $path[0] ?? '';
 
         switch (true) {
             case $type === 'favicon.ico':

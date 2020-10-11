@@ -1,8 +1,8 @@
 <?php
 global $options;
 if (
-    getenv('DEFAULT_RPM') === false
-    || getenv('DEFAULT_ERRORS_LIMIT') === false
+    getenv('RPM') === false
+    || getenv('ERRORS_LIMIT') === false
     || getenv('CLIENTS_SETTINGS') === false
 ) {
     throw new RuntimeException(
@@ -40,8 +40,10 @@ return [
         'max_size' => (int) getenv('MAX_MEDIA_SIZE'),
     ],
     'access' => [
-        'default_rpm' => (int) getenv('DEFAULT_RPM'),
-        'default_errors_limit' => (int) getenv('DEFAULT_ERRORS_LIMIT'),
+        'rpm' => (int) getenv('RPM'),
+        'errors_limit' => (int) getenv('ERRORS_LIMIT'),
+        'media_rpm' => (int) getenv('MEDIA_RPM'),
+        'media_errors_limit' => (int) getenv('MEDIA_ERRORS_LIMIT'),
         'clients_settings' => $clientsSettings,
         'only_public_channels' => (bool) getenv('ONLY_PUBLIC_CHANNELS'),
     ],
