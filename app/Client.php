@@ -38,7 +38,7 @@ class Client
         return $this->get('getHistoryHtml', ['data' => $data]);
     }
 
-    public function getMedia(array $data)
+    public function getMedia(array $data, array $headers)
     {
         $data = array_merge(
             [
@@ -49,10 +49,10 @@ class Client
             $data
         );
 
-        return $this->get('getMedia', ['data' => $data], 'media');
+        return $this->get('getMedia', ['data' => $data], $headers, 'media');
     }
 
-    public function getMediaPreview(array $data)
+    public function getMediaPreview(array $data, array $headers)
     {
         $data = array_merge(
             [
@@ -62,7 +62,7 @@ class Client
             $data
         );
 
-        return $this->get('getMediaPreview', ['data' => $data], 'media');
+        return $this->get('getMediaPreview', ['data' => $data], $headers,'media');
     }
 
     public function getMediaInfo(object $message)
@@ -82,13 +82,14 @@ class Client
     /**
      * @param string $method
      * @param mixed $parameters
+     * @param array $headers
      * @param string $responseType
      * @param int $retry
      *
      * @return object
      * @throws \Exception
      */
-    private function get(string $method, $parameters = [], string $responseType = 'json', $retry = 0)
+    private function get(string $method, $parameters = [], array $headers = [], string $responseType = 'json', $retry = 0)
     {
         if ($retry) {
             //Делаем попытку реконекта
@@ -98,7 +99,7 @@ class Client
         }
 
         $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
-        $curl->setHeaders(['Content-Type' => 'application/json']);
+        $curl->setHeaders(array_merge(['content-type' => 'application/json'], $headers));
         $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);
 
@@ -118,7 +119,7 @@ class Client
                 break;
             case 'media':
                 if (
-                    $curl->statusCode === 200 &&
+                    in_array($curl->statusCode, [200,206], true) &&
                     !empty($curl->body) &&
                     !empty($curl->headers['content-length']) &&
                     !empty($curl->headers['content-type'])
@@ -126,10 +127,7 @@ class Client
                     $body = (object)[
                         'response' => [
                             'file' => $curl->body,
-                            'headers' => [
-                                'Content-Length' => $curl->headers['content-length'],
-                                'Content-Type' => $curl->headers['content-type'],
-                            ],
+                            'headers' => $curl->headers,
                         ],
                     ];
                 }
@@ -145,9 +143,9 @@ class Client
                 break;
         }
 
-        if (!in_array($curl->statusCode, [200,302], true) || $curl->errCode || $errorMessage) {
+        if (!in_array($curl->statusCode, [200,206,302], true) || $curl->errCode || $errorMessage) {
             if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {
-                return $this->get($method, $parameters, $responseType, ++$retry);
+                return $this->get($method, $parameters, $headers, $responseType, ++$retry);
             }
             if ($errorMessage) {
                 throw new \UnexpectedValueException($errorMessage, $body->errors[0]->code ?? 400);

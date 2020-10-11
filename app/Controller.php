@@ -207,9 +207,11 @@ class Controller {
     /**
      * @param Client $client
      *
+     * @param Request $request
+     *
      * @return Controller
      */
-    private function generateResponse(Client $client): self
+    private function generateResponse(Client $client, Request $request): self
     {
 
         if ($this->response['errors']) {
@@ -236,7 +238,7 @@ class Controller {
 
                 if ($this->request['preview']) {
                     try {
-                        $this->response['data'] = $client->getMediaPreview($data);
+                        $this->response['data'] = $client->getMediaPreview($data, $request->header);
                     } catch (\Throwable $e) {
                         $this->response['type'] = 'file';
                         $this->response['file'] = ROOT_DIR . '/no-image.jpg';
@@ -247,7 +249,7 @@ class Controller {
                         $this->response['code'] = 404;
                     }
                 } else {
-                    $this->response['data'] = $client->getMedia($data);
+                    $this->response['data'] = $client->getMedia($data, $request->header);
                 }
                 if (!empty($this->response['data']['headers']['Location'])) {
                     $this->response['type'] = 'redirect';
