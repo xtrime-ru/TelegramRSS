@@ -102,6 +102,7 @@ class Client
         $curl->setHeaders(array_merge(['content-type' => 'application/json'], $headers));
         $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);
+        $curl->close();
 
         $body = '';
         $errorMessage = '';
@@ -128,6 +129,7 @@ class Client
                         'response' => [
                             'file' => $curl->body,
                             'headers' => $curl->headers,
+                            'code' => $curl->statusCode,
                         ],
                     ];
                 }

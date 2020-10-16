@@ -333,6 +333,7 @@ class Controller {
                     break;
                 case 'media':
                     $this->response['headers'] = $this->response['data']['headers'];
+                    $this->response['code'] = $this->response['data']['code'];
                     $this->response['data'] = $this->response['data']['file'];
                     break;
                 case 'redirect':
