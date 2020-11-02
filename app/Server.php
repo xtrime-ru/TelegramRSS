@@ -39,7 +39,7 @@ class Server {
                 //иначе их данные будут в области видимости всех запросов.
 
                 //Телеграм клиент инициализируется 1 раз и используется во всех запросах.
-                new Controller($request, $response, $client, $accessControl);
+                (new Controller($accessControl))->process($request, $response, $client);
                 if (++$counter % 100 === 0) {
                 	gc_collect_cycles();
 					$counter = 0;
