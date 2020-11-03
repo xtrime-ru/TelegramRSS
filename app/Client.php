@@ -9,7 +9,7 @@ class Client
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
     private const TIMEOUT = 1;
-    private const RETRY_MESSAGE = 'Fatal error. Exit.';
+    public const CLIENT_UNAVAILABLE_MESSAGE = 'Telegram client connection error';
 
     /**
      * Client constructor.
@@ -109,7 +109,7 @@ class Client
 
         if ($curl->statusCode === 302 && !empty($curl->headers['location'])) {
             $responseType = 'redirect';
-        } elseif (strpos($curl->headers['content-type'], 'json') !== false) {
+        } elseif (!empty($curl->headers['content-type']) && strpos($curl->headers['content-type'], 'json') !== false) {
             $responseType = 'json';
         }
 
@@ -146,17 +146,17 @@ class Client
         }
 
         if (!in_array($curl->statusCode, [200,206,302], true) || $curl->errCode || $errorMessage) {
-            if ((!$errorMessage || $errorMessage === static::RETRY_MESSAGE) && $retry < static::RETRY) {
+            if (!$errorMessage && $retry < static::RETRY) {
                 return $this->get($method, $parameters, $headers, $responseType, ++$retry);
             }
             if ($errorMessage) {
                 throw new \UnexpectedValueException($errorMessage, $body->errors[0]->code ?? 400);
             }
-            throw new \UnexpectedValueException('Telegram client connection error', $curl->statusCode);
+            throw new \UnexpectedValueException(static::CLIENT_UNAVAILABLE_MESSAGE, $curl->statusCode);
         }
 
         if (!$result = $body->response ?? null) {
-            throw new \UnexpectedValueException('Telegram client connection error', $curl->statusCode);
+            throw new \UnexpectedValueException(static::CLIENT_UNAVAILABLE_MESSAGE, $curl->statusCode);
         }
         return $result;
 

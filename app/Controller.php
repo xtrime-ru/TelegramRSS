@@ -280,8 +280,9 @@ class Controller {
         } catch (Exception $e) {
             $this->response['code'] = $e->getCode() ?: 400;
             $this->response['errors'][] = $e->getMessage();
-
-            $this->user->addError($e->getMessage(), $this->request['url']);
+            if ($e->getMessage() !== Client::CLIENT_UNAVAILABLE_MESSAGE) {
+                $this->user->addError($e->getMessage(), $this->request['url']);
+            }
         }
 
         return $this;
