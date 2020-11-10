@@ -233,11 +233,9 @@ class Controller {
                     ],
                 ];
 
-                $info = $client->getInfo($this->request['peer']);
-
                 if (
-                    !in_array($info->type, ['channel', 'supergroup']) &&
-                    Config::getInstance()->get('access.only_public_channels')
+                    Config::getInstance()->get('access.only_public_channels') &&
+                    !in_array($client->getInfo($this->request['peer'])->type, ['channel', 'supergroup'])
                 ) {
                     throw new UnexpectedValueException('This is not a public channel', 403);
                 }
