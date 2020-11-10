@@ -91,6 +91,15 @@ class Client
      */
     private function get(string $method, $parameters = [], array $headers = [], string $responseType = 'json', $retry = 0)
     {
+        unset(
+            $headers['host'],
+            $headers['remote_addr'],
+            $headers['x-forwarded-for'],
+            $headers['connection'],
+            $headers['cache-control'],
+            $headers['upgrade-insecure-requests'],
+            $headers['accept-encoding'],
+        );
         if ($retry) {
             //Делаем попытку реконекта
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
