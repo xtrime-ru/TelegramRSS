@@ -27,20 +27,6 @@ class Config {
     }
 
     /**
-     * prevent the instance from being cloned (which would create a second instance of it)
-     */
-    private function __clone()
-    {
-    }
-
-    /**
-     * prevent from being unserialized (which would create a second instance of it)
-     */
-    private function __wakeup()
-    {
-    }
-
-    /**
      * @param string $key
      * @param null $default
      * @return mixed|null
