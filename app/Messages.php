@@ -76,7 +76,7 @@ class Messages {
                             $info = $this->getMediaInfo($media);
                             $preview = [
                                 'href' => $info->url ?? null,
-                                'image' => $this->getMediaUrl($message, $info, true),
+                                'image' => $this->getMediaUrl($media, $info, true),
                             ];
                             if ($preview['href'] && $preview['image']) {
                                 $parsedMessage['preview'][] = $preview;
