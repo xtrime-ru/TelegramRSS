@@ -11,6 +11,7 @@
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
+        "ext-mbstring": "*",
         "ext-swoole": ">=4.1"
     },
     "require-dev": {
