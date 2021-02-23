@@ -126,7 +126,7 @@ class Messages {
 
         $mime = $message->media->document->mime_type ?? '';
         if (strpos($mime, 'video') !== false) {
-            $parsedMessage['title'] = '[Video]' . end($message->media->document->attributes)['file_name'] ?? '';
+            $parsedMessage['title'] = '[Video]';
         } elseif ($message->media->_ === 'messageMediaPhoto') {
             $parsedMessage['title'] = '[Photo]';
         } elseif (!empty($message->media)) {
