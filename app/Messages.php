@@ -85,11 +85,6 @@ class Messages {
                         $groupedMessages = [];
                     }
 
-                    $mime = $message->media->document->mime_type ?? '';
-                    if (strpos($mime, 'video') !== false) {
-                        $parsedMessage['title'] = '[Video]';
-                    }
-
                     if (!empty($message->media->webpage)) {
                         $parsedMessage['webpage'] = [
                             'site_name' => $message->media->webpage->site_name ?? null,
@@ -101,11 +96,44 @@ class Messages {
                         $parsedMessage['preview'] = [];
                     }
 
+                    $parsedMessage = $this->setTitle($parsedMessage, $message);
+
                     $this->list[$message->id] = $parsedMessage;
                 }
             }
         }
         return $this;
+    }
+
+    private function setTitle(array $parsedMessage, \stdClass $message): array {
+
+        $descriptionText = strip_tags($parsedMessage['description']);
+
+        if (mb_strlen($descriptionText) > 50) {
+            //Get first sentence from decription
+            preg_match('/(?<sentence>.*?\b\W*(?:\.|\?|\!))/ui', $descriptionText, $matches);
+
+            $parsedMessage['title'] = $matches['sentence'] ?? null;
+
+            if ($parsedMessage['title']) {
+                return $parsedMessage;
+            }
+
+            //Get first 100 symbols from description
+            $parsedMessage['title'] = mb_strimwidth($descriptionText, 0, 100, ' [...]');
+            return $parsedMessage;
+        }
+
+        $mime = $message->media->document->mime_type ?? '';
+        if (strpos($mime, 'video') !== false) {
+            $parsedMessage['title'] = '[Video]' . end($message->media->document->attributes)['file_name'] ?? '';
+        } elseif ($message->media->_ === 'messageMediaPhoto') {
+            $parsedMessage['title'] = '[Photo]';
+        } elseif (!empty($message->media)) {
+            $parsedMessage['title'] = '[Media]';
+        }
+
+        return $parsedMessage;
     }
 
     /**
