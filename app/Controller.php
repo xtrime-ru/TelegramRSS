@@ -225,54 +225,59 @@ class Controller {
         }
 
         try {
-            //Make request to refresh cache.
-            $peer = $client->search($this->request['peer']);
-            if (
+            if ($this->request['peer']) {
+                //Make request to refresh cache.
+                $peer = $client->search($this->request['peer']);
+                if (
                 Config::getInstance()->get('access.only_public_channels')
-            ) {
-                if ($peer === null) {
-                    throw new UnexpectedValueException('Public channel not found', 404);
+                ) {
+                    if ($peer === null) {
+                        throw new UnexpectedValueException('Public channel not found', 404);
+                    }
+                    if (!in_array($peer->_, ['channel', 'supergroup'], true)) {
+                        throw new UnexpectedValueException('This is not a public channel', 403);
+                    }
                 }
-                if (!in_array($peer->_, ['channel', 'supergroup'], true)) {
-                    throw new UnexpectedValueException('This is not a public channel', 403);
-                }
-            }
 
-            if ($this->response['type'] === 'media') {
-                $data = [
-                    'peer' => $this->request['peer'],
-                    'id' => [
-                        $this->request['message'],
-                    ],
-                ];
+                if ($this->response['type'] === 'media') {
+                    $data = [
+                        'peer' => $this->request['peer'],
+                        'id' => [
+                            $this->request['message'],
+                        ],
+                    ];
 
-                if ($this->request['preview']) {
-                    try {
-                        $this->response['data'] = $client->getMediaPreview($data, $request->header);
-                    } catch (\Throwable $e) {
-                        $this->response['type'] = 'file';
-                        $this->response['file'] = ROOT_DIR . '/no-image.jpg';
-                        $this->response['headers'] = [
-                            'Content-Length' => filesize($this->response['file']),
-                            'Content-Type' => 'image/jpeg',
-                        ];
-                        $this->response['code'] = 404;
+                    if ($this->request['preview']) {
+                        try {
+                            $this->response['data'] = $client->getMediaPreview($data, $request->header);
+                        } catch (\Throwable $e) {
+                            $this->response['type'] = 'file';
+                            $this->response['file'] = ROOT_DIR . '/no-image.jpg';
+                            $this->response['headers'] = [
+                                'Content-Length' => filesize($this->response['file']),
+                                'Content-Type' => 'image/jpeg',
+                            ];
+                            $this->response['code'] = 404;
+                        }
+                    } else {
+                        $this->response['data'] = $client->getMedia($data, $request->header);
+                    }
+                    if (!empty($this->response['data']['headers']['Location'])) {
+                        $this->response['type'] = 'redirect';
                     }
                 } else {
-                    $this->response['data'] = $client->getMedia($data, $request->header);
+                    $this->response['data'] = $client->getHistoryHtml(
+                        [
+                            'peer' => $this->request['peer'],
+                            'limit' => $this->request['limit'],
+                            'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
+                        ]
+                    );
                 }
-                if (!empty($this->response['data']['headers']['Location'])) {
-                    $this->response['type'] = 'redirect';
-                }
-            } elseif ($this->request['peer']) {
-                $this->response['data'] = $client->getHistoryHtml(
-                    [
-                        'peer' => $this->request['peer'],
-                        'limit' => $this->request['limit'],
-                        'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
-                    ]
-                );
             }
+
+
+
 
         } catch (Exception $e) {
             $this->response['code'] = $e->getCode() ?: 400;
