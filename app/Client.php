@@ -70,9 +70,24 @@ class Client
         return $this->get('getDownloadInfo', ['message' => $message]);
     }
 
-    public function getInfo($peer)
+    public function getInfo(string $peer)
     {
         return $this->get('getInfo', $peer);
+    }
+
+    public function search(string $username): ?\stdClass
+    {
+        $username = ltrim( $username, '@');
+        $peers = $this->get('contacts.search', ['data' => [
+            'q' => "@{$username}",
+            'limit' => 0,
+        ]]);
+        foreach (array_merge($peers->chats, $peers->users) as $peer) {
+            if (strtolower($peer->username ?? '') === strtolower($username)) {
+                return $peer;
+            }
+        }
+        return null;
     }
 
     public function getId($chat) {
