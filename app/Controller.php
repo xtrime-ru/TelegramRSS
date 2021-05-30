@@ -227,16 +227,11 @@ class Controller {
         try {
             if ($this->request['peer']) {
                 //Make request to refresh cache.
-                $peer = $client->search($this->request['peer']);
                 if (
-                Config::getInstance()->get('access.only_public_channels')
+                    Config::getInstance()->get('access.only_public_channels') &&
+                    !in_array($client->getInfo($this->request['peer'])->type, ['channel', 'supergroup'])
                 ) {
-                    if ($peer === null) {
-                        throw new UnexpectedValueException('Public channel not found', 404);
-                    }
-                    if (!in_array($peer->_, ['channel', 'supergroup'], true)) {
-                        throw new UnexpectedValueException('This is not a public channel', 403);
-                    }
+                    throw new UnexpectedValueException('This is not a public channel', 403);
                 }
 
                 if ($this->response['type'] === 'media') {

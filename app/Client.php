@@ -80,8 +80,9 @@ class Client
         $username = ltrim( $username, '@');
         $peers = $this->get('contacts.search', ['data' => [
             'q' => "@{$username}",
-            'limit' => 0,
+            'limit' => 1,
         ]]);
+
         foreach (array_merge($peers->chats, $peers->users) as $peer) {
             if (strtolower($peer->username ?? '') === strtolower($username)) {
                 return $peer;
