@@ -68,6 +68,7 @@ class Controller {
     private User $user;
 
     private string $indexPage = __DIR__ . '/../index.html';
+    private string $forbiddenUsernamesRegex;
 
     /**
      * Controller constructor.
@@ -77,6 +78,7 @@ class Controller {
     public function __construct(AccessControl $accessControl)
     {
         $this->accessControl = $accessControl;
+        $this->forbiddenUsernamesRegex = (string)Config::getInstance()->get('access.forbidden_peer_regex');
     }
 
     /**
@@ -193,6 +195,14 @@ class Controller {
                 $this->response['code'] = 403;
                 $this->response['errors'][] = "BOTS NOT ALLOWED";
             }
+        }
+
+        if (
+            $this->forbiddenUsernamesRegex &&
+            preg_match("/{$this->forbiddenUsernamesRegex}/i", $this->request['peer'])
+        ) {
+            $this->response['code'] = 403;
+            $this->response['errors'][] = "PEER NOT ALLOWED";
         }
 
         if ($this->request['peer']) {
