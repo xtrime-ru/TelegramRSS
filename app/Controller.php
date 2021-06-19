@@ -194,6 +194,7 @@ class Controller {
             if (preg_match('/bot$/i', $this->request['peer'])) {
                 $this->response['code'] = 403;
                 $this->response['errors'][] = "BOTS NOT ALLOWED";
+                $this->user->addError("BOTS NOT ALLOWED", $this->request['url']);
             }
         }
 
@@ -203,6 +204,7 @@ class Controller {
         ) {
             $this->response['code'] = 403;
             $this->response['errors'][] = "PEER NOT ALLOWED";
+            $this->user->addError("PEER NOT ALLOWED", $this->request['url']);
         }
 
         if ($this->request['peer']) {
