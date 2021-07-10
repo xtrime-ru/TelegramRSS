@@ -111,9 +111,10 @@ class Messages {
 
         if (mb_strlen($descriptionText) > 50) {
             //Get first sentence from decription
-            preg_match('/(?<sentence>.*?\b\W*(?:\.|\?|\!))/ui', $descriptionText, $matches);
+            preg_match('/(?<sentence>.*?\b\W*(?:\.|\?|\!|\n))/ui', $descriptionText, $matches);
 
             $parsedMessage['title'] = $matches['sentence'] ?? null;
+            $parsedMessage['title'] = trim($parsedMessage['title']);
 
             if ($parsedMessage['title']) {
                 return $parsedMessage;
