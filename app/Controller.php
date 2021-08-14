@@ -227,7 +227,6 @@ class Controller {
      */
     private function generateResponse(Client $client, Request $request): self
     {
-
         if ($this->response['errors']) {
             return $this;
         }
@@ -278,14 +277,10 @@ class Controller {
                     );
                 }
             }
-
-
-
-
         } catch (Exception $e) {
             $this->response['code'] = $e->getCode() ?: 400;
             $this->response['errors'][] = $e->getMessage();
-            if ($e->getMessage() !== Client::CLIENT_UNAVAILABLE_MESSAGE) {
+            if ($e->getMessage() !== Client::MESSAGE_CLIENT_UNAVAILABLE) {
                 $this->user->addError($e->getMessage(), $this->request['url']);
             }
             ForbiddenPeers::add($this->request['peer'], $e->getMessage());

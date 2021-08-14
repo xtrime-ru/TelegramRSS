@@ -1,3 +1,4 @@
 .*
 !.env.docker.example
-log/
+log/*
+cache/*

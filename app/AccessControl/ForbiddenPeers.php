@@ -2,30 +2,36 @@
 
 namespace TelegramRSS\AccessControl;
 
+use TelegramRSS\Client;
 use TelegramRSS\Config;
 
 final class ForbiddenPeers
 {
+
     private static ?string $regex = null;
 
-    private static $errorTypes = [
-        'USERNAME_INVALID',
-        'CHANNEL_PRIVATE',
-        'This peer is not present in the internal peer database',
-    ];
-
     /** @var array<string, string> */
-    private static array $peers = [];
+    private static ?array $peers = null;
+
+    private const FILE = ROOT_DIR . '/cache/forbidden-peers.csv';
+    /** @var resource|null */
+    private static $filePointer = null;
 
     public static function add(string $peer, string $error): void {
+        if (
+            $error === Client::MESSAGE_CLIENT_UNAVAILABLE ||
+            $error === 'Empty message' ||
+            $error === 'Connection closed unexpectedly' ||
+            stripos($error, Client::MESSAGE_FLOOD_WAIT) !== false ||
+            stripos($error, 'Media') !== false
+        ) {
+            return;
+        }
+
         $peer = mb_strtolower($peer);
 
-        foreach (self::$errorTypes as $errorType) {
-            if ($errorType === $error) {
-                self::$peers[$peer] = $error;
-                break;
-            }
-        }
+        self::$peers[$peer] = $error;
+        fputcsv(self::getFilePointer(), [$peer, $error]);
     }
 
     /**
@@ -42,11 +48,34 @@ final class ForbiddenPeers
             self::$regex = (string)Config::getInstance()->get('access.forbidden_peer_regex');
         }
 
+        if (self::$peers === null) {
+            if (file_exists(self::FILE)) {
+                $file = self::getFilePointer();
+                while(!feof($file)){
+                    [$oldPeer, $error] = fgetcsv($file);
+                    if ($oldPeer && $error) {
+                        self::$peers[$oldPeer] = $error;
+                    }
+                }
+            }
+        }
+
         $regex = self::$regex;
         if ($regex && preg_match("/{$regex}/i", $peer)) {
             return "PEER NOT ALLOWED";
         }
 
         return self::$peers[$peer] ?? null;
+    }
+
+    /**
+     * @return false|resource|null
+     */
+    private static function getFilePointer() {
+        if (self::$filePointer === null) {
+            self::$filePointer = fopen(self::FILE, 'cb+');
+        }
+
+        return self::$filePointer;
     }
 }

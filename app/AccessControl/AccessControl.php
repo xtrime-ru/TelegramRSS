@@ -12,6 +12,11 @@ class AccessControl
     /** @var User[] */
     private array $mediaUsers = [];
 
+    private const FILES = [
+        ROOT_DIR . '/cache/users.cache' => 'users',
+        ROOT_DIR . '/cache/media-users.cache' => 'mediaUsers',
+    ];
+
     /** @var int Interval to remove old clients: 60 seconds */
     private const CLEANUP_INTERVAL_MS = 60*1000;
     private int $rpmLimit;
@@ -33,8 +38,11 @@ class AccessControl
 
         $this->clientsSettings = (array) Config::getInstance()->get('access.clients_settings');
 
+        $this->loadUsers();
+
         Timer::tick(static::CLEANUP_INTERVAL_MS, function () {
             $this->removeOldUsers();
+            $this->saveUsers();
         });
     }
 
@@ -49,6 +57,34 @@ class AccessControl
         foreach ($this->mediaUsers as $ip => $user) {
             if ($user->isOld($now)) {
                 unset($this->mediaUsers[$ip]);
+            }
+        }
+    }
+
+    private function saveUsers(): void {
+        foreach (self::FILES as $path => $object) {
+            file_put_contents($path, '');
+            foreach ($this->{$object} as $key => $value) {
+                file_put_contents($path, serialize([$key=>$value]) . PHP_EOL,FILE_APPEND);
+            }
+
+        }
+    }
+
+    private function loadUsers(): void {
+        foreach (self::FILES as $path => $object) {
+            if(file_exists($path)) {
+                $file = fopen($path, 'rb');
+                while(!feof($file)) {
+                    $line = fgets($file);
+                    if ($line) {
+                        $line = trim($line);
+                        $item = unserialize($line, ['allowed_classes'=>[User::class]]);
+                        $this->{$object}[array_key_first($item)] = reset($item);
+                    }
+                }
+            } else {
+                $this->{$object} = [];
             }
         }
     }

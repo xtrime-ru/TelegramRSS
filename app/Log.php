@@ -34,7 +34,6 @@ class Log {
         if ($this->file) {
             $this->echoLog = false;
         }
-        $this->createDirIfNotExists();
     }
 
 
@@ -72,22 +71,6 @@ class Log {
             Coroutine::writeFile("{$this->dir}/" . $this->getFilename(), $text, FILE_APPEND | LOCK_EX);
         }
 
-        return $this;
-    }
-
-    /**
-     * @return Log
-     */
-    private function createDirIfNotExists(): self
-    {
-        if ($this->echoLog) {
-            return $this;
-        }
-        if (!is_dir($this->dir)) {
-            if (!mkdir($this->dir, 0755, true) && !is_dir($this->dir)) {
-                throw new \RuntimeException("Directory {$this->dir} was not created");
-            }
-        }
         return $this;
     }
 

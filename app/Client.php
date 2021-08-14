@@ -9,7 +9,8 @@ class Client
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
     private const TIMEOUT = 1;
-    public const CLIENT_UNAVAILABLE_MESSAGE = 'Telegram client connection error';
+    public const MESSAGE_CLIENT_UNAVAILABLE = 'Telegram client connection error';
+    public const MESSAGE_FLOOD_WAIT = 'FLOOD_WAIT';
 
     /**
      * Client constructor.
@@ -177,11 +178,11 @@ class Client
             if ($errorMessage) {
                 throw new \UnexpectedValueException($errorMessage, $body->errors[0]->code ?? 400);
             }
-            throw new \UnexpectedValueException(static::CLIENT_UNAVAILABLE_MESSAGE, $curl->statusCode);
+            throw new \UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, $curl->statusCode);
         }
 
         if (!$result = $body->response ?? null) {
-            throw new \UnexpectedValueException(static::CLIENT_UNAVAILABLE_MESSAGE, $curl->statusCode);
+            throw new \UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, $curl->statusCode);
         }
         return $result;
 

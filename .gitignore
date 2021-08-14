@@ -4,4 +4,5 @@ vendor
 *.madeline
 *.madeline.lock
 composer.phar
-log
+log/*
+cache/*
