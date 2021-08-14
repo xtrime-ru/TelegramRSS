@@ -6,6 +6,7 @@ use Exception;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use TelegramRSS\AccessControl\AccessControl;
+use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;
 use Throwable;
 use UnexpectedValueException;
@@ -68,7 +69,6 @@ class Controller {
     private User $user;
 
     private string $indexPage = __DIR__ . '/../index.html';
-    private string $forbiddenUsernamesRegex;
 
     /**
      * Controller constructor.
@@ -78,7 +78,6 @@ class Controller {
     public function __construct(AccessControl $accessControl)
     {
         $this->accessControl = $accessControl;
-        $this->forbiddenUsernamesRegex = (string)Config::getInstance()->get('access.forbidden_peer_regex');
     }
 
     /**
@@ -152,11 +151,9 @@ class Controller {
             case $type === 'favicon.ico':
                 $this->response['type'] = $type;
                 return $this;
-                break;
             case count($path) < 2:
                 $this->response['type'] = 'html';
                 return $this;
-                break;
         }
 
         if (array_key_exists($type, $this->responseList)) {
@@ -198,16 +195,15 @@ class Controller {
             }
         }
 
-        if (
-            $this->forbiddenUsernamesRegex &&
-            preg_match("/{$this->forbiddenUsernamesRegex}/i", $this->request['peer'])
-        ) {
-            $this->response['code'] = 403;
-            $this->response['errors'][] = "PEER NOT ALLOWED";
-            $this->user->addError("PEER NOT ALLOWED", $this->request['url']);
-        }
-
         if ($this->request['peer']) {
+
+            $error = ForbiddenPeers::check($this->request['peer']);
+            if ($error !== null) {
+                $this->response['code'] = 403;
+                $this->response['errors'][] = $error;
+                $this->user->addError($error, $this->request['url']);
+            }
+
             $this->user->addRequest($this->request['url']);
 
             if ($this->user->isBanned()) {
@@ -292,6 +288,7 @@ class Controller {
             if ($e->getMessage() !== Client::CLIENT_UNAVAILABLE_MESSAGE) {
                 $this->user->addError($e->getMessage(), $this->request['url']);
             }
+            ForbiddenPeers::add($this->request['peer'], $e->getMessage());
         }
 
         return $this;
