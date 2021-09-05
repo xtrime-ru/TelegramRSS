@@ -7,7 +7,7 @@ class Messages {
     private const TELEGRAM_URL = 'https://t.me/';
 
     private $list = [];
-    private $telegramResponse;
+    private \stdClass $telegramResponse;
     private $channelUrl;
     private $username;
     private $client;
@@ -21,10 +21,10 @@ class Messages {
 
     /**
      * Messages constructor.
-     * @param $telegramResponse
+     * @param \stdClass $telegramResponse
      * @param Client $client
      */
-    public function __construct($telegramResponse, Client $client) {
+    public function __construct(\stdClass $telegramResponse, Client $client) {
         $this->telegramResponse = $telegramResponse;
         $this->client = $client;
         $this->setUsername();
@@ -125,13 +125,15 @@ class Messages {
             return $parsedMessage;
         }
 
-        $mime = $message->media->document->mime_type ?? '';
-        if (strpos($mime, 'video') !== false) {
-            $parsedMessage['title'] = '[Video]';
-        } elseif ($message->media->_ === 'messageMediaPhoto') {
-            $parsedMessage['title'] = '[Photo]';
-        } elseif (!empty($message->media)) {
-            $parsedMessage['title'] = '[Media]';
+        if (!empty($message->media)) {
+            $mime = $message->media->document->mime_type ?? '';
+            if (strpos($mime, 'video') !== false) {
+                $parsedMessage['title'] = '[Video]';
+            } elseif ($message->media->_ === 'messageMediaPhoto') {
+                $parsedMessage['title'] = '[Photo]';
+            } else {
+                $parsedMessage['title'] = '[Media]';
+            }
         }
 
         return $parsedMessage;
