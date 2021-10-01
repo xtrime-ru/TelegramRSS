@@ -139,6 +139,13 @@ class Client
             $responseType = 'json';
         }
 
+        unset(
+            $curl->headers['content-encoding'],
+            $curl->headers['connection'],
+            $curl->headers['keep-alive'],
+            $curl->headers['transfer-encoding'],
+        );
+
         switch ($responseType) {
             case 'json':
                 $body = json_decode($curl->body, false);
@@ -148,7 +155,6 @@ class Client
                 if (
                     in_array($curl->statusCode, [200,206], true) &&
                     !empty($curl->body) &&
-                    !empty($curl->headers['content-length']) &&
                     !empty($curl->headers['content-type'])
                 ) {
                     $body = (object)[
