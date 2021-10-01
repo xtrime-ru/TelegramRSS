@@ -61,7 +61,7 @@ class Messages {
                         'url' => $this->getMessageUrl($message->id),
                         'title' => null,
                         'description' => $description,
-                        'media' => $info,
+                        'media' => [$info],
                         'preview' => [
                             [
                                 'href' => $info->url ?? null,
@@ -80,6 +80,7 @@ class Messages {
                             ];
                             if ($preview['href'] && $preview['image']) {
                                 $parsedMessage['preview'][] = $preview;
+                                $parsedMessage['media'][] = $info;
                             }
                         }
                         $groupedMessages = [];

@@ -106,13 +106,14 @@ class RSS {
                 $newItem->addChild('link', $item['url']);
                 $newItem->addChild('guid', $item['url']);
             }
-            if (!empty($item['media']->url)) {
-                $media = $item['media'];
-                $enclosure = $newItem->addChild('enclosure');
-                $enclosure['url'] = $media->url;
-                $enclosure['type'] = $media->mime;
-                $enclosure['length'] = $media->size;
-                unset($enclosure);
+            foreach ($item['media'] as $media) {
+                if (!empty($media->url)) {
+                    $enclosure = $newItem->addChild('enclosure');
+                    $enclosure['url'] = $media->url;
+                    $enclosure['type'] = $media->mime;
+                    $enclosure['length'] = $media->size;
+                    unset($enclosure);
+                }
             }
         }
 
