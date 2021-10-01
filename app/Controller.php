@@ -335,7 +335,7 @@ class Controller {
                     );
                     break;
                 case 'rss':
-                    $messages = new Messages($this->response['data'], $client);
+                    $messages = new Messages($this->response['data'], $client, $this->request['peer']);
                     $rss = new RSS($messages->get(), $this->request['peer']);
                     $this->response['data'] = $rss->get();
                     break;

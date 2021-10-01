@@ -19,27 +19,12 @@ class Messages {
         'messageMediaWebPage',
     ];
 
-    /**
-     * Messages constructor.
-     * @param \stdClass $telegramResponse
-     * @param Client $client
-     */
-    public function __construct(\stdClass $telegramResponse, Client $client) {
+    public function __construct(\stdClass $telegramResponse, Client $client, string $peer) {
         $this->telegramResponse = $telegramResponse;
         $this->client = $client;
-        $this->setUsername();
+        $this->username = $peer;
+        $this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
         $this->parseMessages();
-    }
-
-    private function setUsername() {
-        if (!$this->channelUrl) {
-            $chat = $this->telegramResponse->chats[0];
-            $this->username = $chat->username ?? $this->client->getId($chat);
-            if (!$this->username) {
-                return null;
-            }
-            $this->channelUrl = static::TELEGRAM_URL . $this->username . '/';
-        }
     }
 
     private function parseMessages(): self {
