@@ -11,11 +11,14 @@
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
-        "ext-mbstring": "*",
-        "ext-swoole": ">=4.1"
+        "ext-mbstring": "*"
     },
     "require-dev": {
         "swoole/ide-helper": "^4"
+    },
+    "suggest": {
+        "ext-swoole": "Swoole or openswoole extension >= 4.1 required",
+        "ext-openswoole": "Swoole or openswoole extension >= 4.1 required"
     },
     "authors": [
         {

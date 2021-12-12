@@ -5,10 +5,10 @@ RUN apt-get update \
     # Install additional extension \
     && docker-php-ext-install -j$(nproc) sockets zip \
     && mkdir -p /usr/src/php/ext/ && cd /usr/src/php/ext/ \
-    && pecl bundle swoole \
-    && docker-php-ext-configure swoole --enable-sockets=yes --enable-openssl=yes \
-    && docker-php-ext-install -j$(nproc) swoole \
-
+    && pecl bundle openswoole \
+    && docker-php-ext-configure openswoole --enable-sockets=yes --enable-openssl=yes \
+    && docker-php-ext-install -j$(nproc) openswoole \
+    # Cleanup
     && docker-php-source delete \
     && apt-get autoremove --purge -y && apt-get autoclean -y && apt-get clean -y \
     && rm -rf /usr/src \
