@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  telegram-rss:
+    image: xtrime/telegram-rss:dev
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    ports:
+      - "127.0.0.1:9504:9504"
+      - "9003"
+    environment:
+      PHP_IDE_CONFIG: "serverName=Docker"

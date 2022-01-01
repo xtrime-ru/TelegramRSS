@@ -96,6 +96,19 @@ class Client
         return $this->get('getId', [$chat]);
     }
 
+    public function getSponsoredMessages($peer) {
+        $messages = (array) $this->get('getSponsoredMessages', $peer);
+        foreach ($messages as $message) {
+            $id = $this->getId($message->from_id);
+            $message->peer = $this->getInfo($id);
+        }
+        return $messages;
+    }
+
+    public function viewSponsoredMessage($peer, $message) {
+        return $this->get('viewSponsoredMessage', ['peer' => $peer, 'message' => $message]);
+    }
+
     /**
      * @param string $method
      * @param mixed $parameters
@@ -187,10 +200,10 @@ class Client
             throw new \UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, $curl->statusCode);
         }
 
-        if (!$result = $body->response ?? null) {
+        if (!property_exists($body, 'response')) {
             throw new \UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, $curl->statusCode);
         }
-        return $result;
+        return $body->response;
 
     }
 }

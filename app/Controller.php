@@ -234,9 +234,10 @@ class Controller {
         try {
             if ($this->request['peer']) {
                 //Make request to refresh cache.
+                $isChannel = in_array($client->getInfo($this->request['peer'])->type, ['channel', 'supergroup']);
                 if (
                     Config::getInstance()->get('access.only_public_channels') &&
-                    !in_array($client->getInfo($this->request['peer'])->type, ['channel', 'supergroup'])
+                    !$isChannel
                 ) {
                     throw new UnexpectedValueException('This is not a public channel', 403);
                 }
@@ -275,6 +276,9 @@ class Controller {
                             'add_offset' => ($this->request['page'] - 1) * $this->request['limit'],
                         ]
                     );
+                    if ($isChannel) {
+                        $this->response['data']->sponsored_messages = $client->getSponsoredMessages($this->request['peer']);
+                    }
                 }
             }
         } catch (Exception $e) {

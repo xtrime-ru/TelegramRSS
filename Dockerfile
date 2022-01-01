@@ -6,7 +6,7 @@ RUN apt-get update \
     && docker-php-ext-install -j$(nproc) sockets zip \
     && mkdir -p /usr/src/php/ext/ && cd /usr/src/php/ext/ \
     && pecl bundle openswoole \
-    && docker-php-ext-configure openswoole --enable-sockets=yes --enable-openssl=yes \
+    && docker-php-ext-configure openswoole --enable-openssl=yes \
     && docker-php-ext-install -j$(nproc) openswoole \
     # Cleanup
     && docker-php-source delete \

@@ -29,6 +29,8 @@ class Messages {
 
     private function parseMessages(): self {
         if ($messages = $this->telegramResponse->messages ?? []) {
+            $messages = array_merge($this->telegramResponse->sponsored_messages ?? [], $messages);
+
             $groupedMessages = [];
             foreach ($messages as $key => $message) {
                 if (
@@ -43,7 +45,7 @@ class Messages {
                 if ($description || $this->hasMedia($message)) {
                     $info = $this->getMediaInfo($message);
                     $parsedMessage = [
-                        'url' => $this->getMessageUrl($message->id),
+                        'url' => $this->getMessageUrl($message),
                         'title' => null,
                         'description' => $description,
                         'media' => [$info],
@@ -84,7 +86,7 @@ class Messages {
 
                     $parsedMessage = $this->setTitle($parsedMessage, $message);
 
-                    $this->list[$message->id] = $parsedMessage;
+                    $this->list[] = $parsedMessage;
                 }
             }
         }
@@ -102,35 +104,52 @@ class Messages {
             $parsedMessage['title'] = $matches['sentence'] ?? null;
             $parsedMessage['title'] = trim($parsedMessage['title']);
 
-            if ($parsedMessage['title']) {
-                return $parsedMessage;
-            }
-
-            //Get first 100 symbols from description
-            $parsedMessage['title'] = mb_strimwidth($descriptionText, 0, 100, ' [...]');
-            return $parsedMessage;
         }
 
         if (!empty($message->media)) {
             $mime = $message->media->document->mime_type ?? '';
             if (strpos($mime, 'video') !== false) {
-                $parsedMessage['title'] = '[Video]';
+                $parsedMessage['title'] = '[Video] ' . $parsedMessage['title'];
             } elseif ($message->media->_ === 'messageMediaPhoto') {
-                $parsedMessage['title'] = '[Photo]';
+                $parsedMessage['title'] = '[Photo] ' . $parsedMessage['title'];
             } else {
-                $parsedMessage['title'] = '[Media]';
+                $parsedMessage['title'] = '[Media] ' . $parsedMessage['title'];
             }
+        }
+
+        if ($message->_ === 'sponsoredMessage') {
+            $parsedMessage['title'] = '[Sponsored] ' . $parsedMessage['title'];
+        }
+
+        $parsedMessage['title'] = trim($parsedMessage['title']);
+
+        //Get first 100 symbols from description
+        if (mb_strlen($parsedMessage['title']) > 100) {
+            $parsedMessage['title'] = mb_strimwidth($descriptionText, 0, 100, ' [...]');
         }
 
         return $parsedMessage;
     }
 
     /**
-     * @param string $messageId
-     * @return string|null
+     * @param object $message
+     * @return string
      */
-    private function getMessageUrl($messageId = '') {
-        return $this->channelUrl . $messageId;
+    private function getMessageUrl(object $message): string {
+        if ($message->_ === 'sponsoredMessage') {
+            $postId = !empty($message->channel_post) ? '/' .  $message->channel_post : '';
+            $startParam = !empty($message->start_param) ? '/?start=' . $message->start_param : '';
+            $peer = $message->peer->bot_api_id;
+            foreach ($message->peer as $property) {
+                if (property_exists($property, 'username')) {
+                    $peer = $property->username;
+                    break;
+                }
+            }
+            return self::TELEGRAM_URL . $peer . $postId . $startParam;
+        } else {
+            return $this->channelUrl . $message->id;
+        }
     }
 
     private function getMediaInfo($message): ?\stdClass {

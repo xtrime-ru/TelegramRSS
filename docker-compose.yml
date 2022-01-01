@@ -1,4 +1,4 @@
-version: '3'
+version: '3.9'
 services:
   telegram-rss:
     image: xtrime/telegram-rss:latest
@@ -17,5 +17,5 @@ services:
         max-file: "2"
 networks:
   default:
-    external:
-      name: telegram-api-server
+    external: true
+    name: telegram-api-server
