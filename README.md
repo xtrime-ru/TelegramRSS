@@ -20,7 +20,8 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 1. Clone this project: `git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS`
 1. Start:
     * Docker: 
-        1. `docker-compose up -d`
+        1. `docker-compose pull`
+        2. `docker-compose up -d`
   
     * Manual:
         1. [Install Swoole php extension](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
