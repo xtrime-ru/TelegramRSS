@@ -2,6 +2,9 @@ version: '3.9'
 services:
   telegram-rss:
     image: xtrime/telegram-rss:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: telegram-rss
     restart: unless-stopped
     ports:
