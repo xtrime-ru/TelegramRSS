@@ -1,4 +1,4 @@
-FROM php:8.0-cli
+FROM php:8.1-cli
 
 RUN apt-get update \
     && apt-get install git zip libzip-dev libssl-dev -y \
@@ -14,18 +14,8 @@ RUN apt-get update \
     && rm -rf /usr/src \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-COPY . /app
-WORKDIR /app
 
-RUN cp -a docker/php/conf.d/. "$PHP_INI_DIR/conf.d/" \
-    && composer install -o --no-dev && composer clear
-
-#Creating symlink to save .env in volume
-RUN mkdir /app/volume/ && \
-    touch '/app/volume/.env.docker' && \
-    ln -s '/app/volume/.env.docker' '/app/.env.docker'
-
-VOLUME ["/app/volume", "/app/log", "/app/cache"]
+ADD docker/php/conf.d/. "$PHP_INI_DIR/conf.d/"
 
 EXPOSE 9504
 
