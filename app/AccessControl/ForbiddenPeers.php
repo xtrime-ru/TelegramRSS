@@ -22,6 +22,7 @@ final class ForbiddenPeers
             $error === Client::MESSAGE_CLIENT_UNAVAILABLE ||
             $error === 'Empty message' ||
             $error === 'Connection closed unexpectedly' ||
+            stripos($error, 'INTERDC') !== false ||
             stripos($error, Client::MESSAGE_FLOOD_WAIT) !== false ||
             stripos($error, 'Media') !== false
         ) {
