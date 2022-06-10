@@ -24,7 +24,8 @@ final class ForbiddenPeers
             $error === 'Connection closed unexpectedly' ||
             stripos($error, 'INTERDC') !== false ||
             stripos($error, Client::MESSAGE_FLOOD_WAIT) !== false ||
-            stripos($error, 'Media') !== false
+            stripos($error, 'Media') !== false ||
+			strpos($error, 'Provided value') === 0
         ) {
             return;
         }
