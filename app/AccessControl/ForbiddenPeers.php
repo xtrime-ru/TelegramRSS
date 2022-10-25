@@ -18,22 +18,18 @@ final class ForbiddenPeers
     private static $filePointer = null;
 
     public static function add(string $peer, string $error): void {
-        if (
-            $error === Client::MESSAGE_CLIENT_UNAVAILABLE ||
-            $error === 'Empty message' ||
-            $error === 'Connection closed unexpectedly' ||
-            stripos($error, 'INTERDC') !== false ||
-            stripos($error, Client::MESSAGE_FLOOD_WAIT) !== false ||
-            stripos($error, 'Media') !== false ||
-			strpos($error, 'Provided value') === 0
-        ) {
-            return;
+        switch ($error) {
+            case 'This peer is not present in the internal peer database':
+            case 'CHANNEL_PRIVATE':
+            case 'USERNAME_INVALID':
+            case 'BOTS NOT ALLOWED':
+            case 'This is not a public channel':
+                $peer = mb_strtolower($peer);
+
+                self::$peers[$peer] = $error;
+                fputcsv(self::getFilePointer(), [$peer, $error]);
+                break;
         }
-
-        $peer = mb_strtolower($peer);
-
-        self::$peers[$peer] = $error;
-        fputcsv(self::getFilePointer(), [$peer, $error]);
     }
 
     /**
