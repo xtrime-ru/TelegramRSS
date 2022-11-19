@@ -8,9 +8,8 @@ class Client
 {
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
-    private const TIMEOUT = 1;
+    private const TIMEOUT = 30;
     public const MESSAGE_CLIENT_UNAVAILABLE = 'Telegram client connection error';
-    public const MESSAGE_FLOOD_WAIT = 'FLOOD_WAIT';
 
     /**
      * Client constructor.
