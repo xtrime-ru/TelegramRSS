@@ -9,6 +9,7 @@ class Client
     private const RETRY = 5;
     private const RETRY_INTERVAL = 3;
     private const TIMEOUT = 30;
+	private ?bool $isPremium = null;
     public const MESSAGE_CLIENT_UNAVAILABLE = 'Telegram client connection error';
 
     /**
@@ -96,11 +97,18 @@ class Client
     }
 
     public function getSponsoredMessages($peer) {
-        $messages = (array) $this->get('getSponsoredMessages', $peer);
-        foreach ($messages as $message) {
-            $id = $this->getId($message->from_id);
-            $message->peer = $this->getInfo($id);
-        }
+		if ($this->isPremium === null) {
+			$self = $this->get('getSelf');
+			$this->isPremium = $self->premium ?? null;
+		}
+	    $messages = [];
+		if (!$this->isPremium) {
+			$messages = (array) $this->get('getSponsoredMessages', $peer);
+			foreach ($messages as $message) {
+				$id = $this->getId($message->from_id);
+				$message->peer = $this->getInfo($id);
+			}
+		}
         return $messages;
     }
 
