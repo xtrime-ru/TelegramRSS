@@ -2,7 +2,7 @@
 
 namespace TelegramRSS;
 
-use Swoole\Coroutine;
+use OpenSwoole\Coroutine;
 
 class Client
 {
@@ -136,7 +136,7 @@ class Client
             Coroutine::sleep(static::RETRY_INTERVAL);
         }
 
-        $curl = new \Co\Http\Client($this->config['address'], $this->config['port'], false);
+        $curl = new Coroutine\Http\Client($this->config['address'], $this->config['port'], false);
         $curl->setHeaders(array_merge(['content-type' => 'application/json'], $headers));
         $curl->post("/api/$method", json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE));
         $curl->recv(static::TIMEOUT);

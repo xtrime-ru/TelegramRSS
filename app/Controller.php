@@ -3,8 +3,8 @@
 namespace TelegramRSS;
 
 use Exception;
-use Swoole\Http\Request;
-use Swoole\Http\Response;
+use OpenSwoole\Http\Request;
+use OpenSwoole\Http\Response;
 use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;

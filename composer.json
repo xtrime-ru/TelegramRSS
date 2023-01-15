@@ -14,7 +14,7 @@
         "ext-mbstring": "*"
     },
     "require-dev": {
-        "swoole/ide-helper": "^4"
+        "openswoole/ide-helper": ">=22"
     },
     "suggest": {
         "ext-swoole": "Swoole or openswoole extension >= 4.1 required",

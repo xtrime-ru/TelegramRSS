@@ -2,7 +2,6 @@
 
 namespace TelegramRSS\AccessControl;
 
-use TelegramRSS\Client;
 use TelegramRSS\Config;
 
 final class ForbiddenPeers

@@ -2,7 +2,7 @@
 
 namespace TelegramRSS\AccessControl;
 
-use Swoole\Timer;
+use OpenSwoole\Timer;
 use TelegramRSS\Config;
 
 class AccessControl

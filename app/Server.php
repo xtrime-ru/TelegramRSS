@@ -2,8 +2,8 @@
 
 namespace TelegramRSS;
 
-use Swoole\Http\Request;
-use Swoole\Http\Response;
+use OpenSwoole\Http\Request;
+use OpenSwoole\Http\Response;
 
 class Server {
     private $config = [];
@@ -22,10 +22,10 @@ class Server {
             ]
         );
 
-        $http_server = new \swoole_http_server(
+        $http_server = new \OpenSwoole\HTTP\Server(
             $this->config['server']['address'],
             $this->config['server']['port'],
-            SWOOLE_BASE //single process
+	        \OpenSwoole\Server::SIMPLE_MODE
         );
 
         $http_server->set($this->config['options']);
