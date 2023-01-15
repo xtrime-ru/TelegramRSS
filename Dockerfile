@@ -1,4 +1,4 @@
-FROM php:8.1-cli
+FROM php:8.2-cli
 
 RUN apt-get update \
     && apt-get install git zip libzip-dev libssl-dev -y \
