@@ -1,5 +1,8 @@
 <?php
 
+use TelegramRSS\Server\Server;
+use TelegramRSS\TgClient;
+
 if (PHP_SAPI !== 'cli') {
     throw new \RuntimeException('Start in CLI');
 }
@@ -23,7 +26,7 @@ $options = [
 ];
 
 if ($options['help']) {
-    $help = 'Fast, simple, async php telegram rss/json server (based on Swoole Server)
+    $help = 'Fast, simple, async php telegram rss/json server (based on Amphp Http Server)
 
 usage: php server.php [--help] [--server-address=127.0.0.1] [--server-port=9504] [--client-address=127.0.0.1] [--client-port=9503]
 
@@ -35,10 +38,10 @@ Options:
     --client-port       Telegram Client port (optional) (default: 9503)
 
 
-Also all options can be set in .env file (see .env.example)
+Also all options can be set in .env.docker file (see .env.docker.example)
 
 If you dont have Telegram client install from here: 
-https://github.com/xtrime-ru/TelegramSwooleClient
+https://github.com/xtrime-ru/TelegramApiServer
 
 Example:
     php server.php
@@ -50,5 +53,5 @@ Example:
 
 require_once __DIR__ . '/bootstrap.php';
 
-$client = new \TelegramRSS\Client($options['client-address'], $options['client-port']);
-new \TelegramRSS\Server($client, $options['server-address'], $options['server-port']);
+$client = new TgClient($options['client-address'], $options['client-port']);
+new Server($client, $options['server-address'], $options['server-port']);

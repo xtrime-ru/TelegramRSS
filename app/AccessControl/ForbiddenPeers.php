@@ -2,7 +2,12 @@
 
 namespace TelegramRSS\AccessControl;
 
+use Amp\File\File;
 use TelegramRSS\Config;
+
+use function Amp\ByteStream\splitLines;
+use function Amp\File\isFile;
+use function Amp\File\openFile;
 
 final class ForbiddenPeers
 {
@@ -14,7 +19,7 @@ final class ForbiddenPeers
 
     private const FILE = ROOT_DIR . '/cache/forbidden-peers.csv';
     /** @var resource|null */
-    private static $filePointer = null;
+    private static ?File $filePointer = null;
 
     public static function add(string $peer, string $error): void {
         switch ($error) {
@@ -24,9 +29,8 @@ final class ForbiddenPeers
             case 'BOTS NOT ALLOWED':
             case 'This is not a public channel':
                 $peer = mb_strtolower($peer);
-
                 self::$peers[$peer] = $error;
-                fputcsv(self::getFilePointer(), [$peer, $error]);
+                self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
                 break;
         }
     }
@@ -46,12 +50,14 @@ final class ForbiddenPeers
         }
 
         if (self::$peers === null) {
-            if (file_exists(self::FILE)) {
+            if (isFile(self::FILE)) {
                 $file = self::getFilePointer();
-                while(!feof($file)){
-                    [$oldPeer, $error] = fgetcsv($file);
-                    if ($oldPeer && $error) {
-                        self::$peers[$oldPeer] = $error;
+                while(!$file->eof()){
+                    foreach (splitLines($file) as $line) {
+                        [$oldPeer, $error] = str_getcsv(trim($line));
+                        if ($oldPeer && $error) {
+                            self::$peers[$oldPeer] = $error;
+                        }
                     }
                 }
             }
@@ -65,14 +71,20 @@ final class ForbiddenPeers
         return self::$peers[$peer] ?? null;
     }
 
-    /**
-     * @return false|resource|null
-     */
-    private static function getFilePointer() {
+    private static function getFilePointer(): File {
         if (self::$filePointer === null) {
-            self::$filePointer = fopen(self::FILE, 'cb+');
+            self::$filePointer = openFile(self::FILE, 'cb+');
         }
 
         return self::$filePointer;
+    }
+
+    static function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
+        $fp = fopen('php://memory', 'r+b');
+        fputcsv($fp, $input, $delimiter, $enclosure);
+        rewind($fp);
+        $data = rtrim(stream_get_contents($fp), "\n");
+        fclose($fp);
+        return $data;
     }
 }

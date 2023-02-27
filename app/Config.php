@@ -6,7 +6,7 @@ namespace TelegramRSS;
 
 class Config {
     private static Config $instance;
-    private array $config;
+    public array $config;
 
     public static function getInstance(): Config
     {
@@ -23,7 +23,7 @@ class Config {
      */
     private function __construct()
     {
-        $this->config = include __DIR__ . '/../config.php';
+        $this->config = include ROOT_DIR . '/config.php';
     }
 
     /**

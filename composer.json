@@ -4,22 +4,24 @@
     "type": "project",
     "homepage": "https://tg.i-c-a.su/",
     "license": "MIT",
-    "keywords": ["telegram", "mtproto", "protocol", "client", "PHP", "swoole", "async", "daemon", "coroutine", "parser", "micro-service", "RSS"],
+    "keywords": ["telegram", "mtproto", "protocol", "client", "PHP", "amphp", "async", "daemon", "coroutine", "parser", "micro-service", "RSS"],
     "require": {
-        "php": "^7.4|^8.0",
+        "php": "^8.1.17||^8.2.4",
+        "amphp/http-server": "^3.x-dev",
+        "amphp/http-server-router": "^2",
+        "amphp/http-client": "^5",
+        "amphp/http-server-static-content": "^2",
+        "amphp/file": "^3",
+        "amphp/http": "^2.x-dev",
         "vlucas/phpdotenv": "^4",
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
-        "ext-mbstring": "*"
+        "ext-mbstring": "*",
+        "ext-pcntl": "*"
     },
-    "require-dev": {
-        "openswoole/ide-helper": ">=22"
-    },
-    "suggest": {
-        "ext-swoole": "Swoole or openswoole extension >= 4.1 required",
-        "ext-openswoole": "Swoole or openswoole extension >= 4.1 required"
-    },
+    "prefer-stable": true,
+    "minimum-stability": "dev",
     "authors": [
         {
             "name": "Alexander Pankratov",

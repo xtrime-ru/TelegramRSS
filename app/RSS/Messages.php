@@ -1,16 +1,20 @@
 <?php
 
-namespace TelegramRSS;
+namespace TelegramRSS\RSS;
 
 
-class Messages {
+use TelegramRSS\Config;
+use TelegramRSS\TgClient;
+
+class Messages
+{
     private const TELEGRAM_URL = 'https://t.me/';
 
-    private $list = [];
-    private \stdClass $telegramResponse;
-    private $channelUrl;
-    private $username;
-    private $client;
+    private array $list = [];
+    private array $telegramResponse;
+    private string $channelUrl;
+    private string $username;
+    private TgClient $client;
 
     private const MEDIA_TYPES = [
         'messageMediaDocument',
@@ -19,7 +23,8 @@ class Messages {
         'messageMediaWebPage',
     ];
 
-    public function __construct(\stdClass $telegramResponse, Client $client, string $peer) {
+    public function __construct(array $telegramResponse, TgClient $client, string $peer)
+    {
         $this->telegramResponse = $telegramResponse;
         $this->client = $client;
         $this->username = $peer;
@@ -27,21 +32,22 @@ class Messages {
         $this->parseMessages();
     }
 
-    private function parseMessages(): self {
-        if ($messages = $this->telegramResponse->messages ?? []) {
-            $messages = array_merge($this->telegramResponse->sponsored_messages ?? [], $messages);
+    private function parseMessages(): self
+    {
+        if ($messages = $this->telegramResponse['messages'] ?? []) {
+            $messages = array_merge($this->telegramResponse['sponsored_messages'] ?? [], $messages);
 
             $groupedMessages = [];
             foreach ($messages as $key => $message) {
                 if (
-                    !empty($message->grouped_id) &&
-                    !empty($messages[$key + 1]->grouped_id) &&
-                    $messages[$key + 1]->grouped_id === $message->grouped_id
+                    !empty($message['grouped_id']) &&
+                    !empty($messages[$key + 1]['grouped_id']) &&
+                    $messages[$key + 1]['grouped_id'] === $message['grouped_id']
                 ) {
                     $groupedMessages[] = $message;
                     continue;
                 }
-                $description = $message->message ?? '';
+                $description = $message['message'] ?? '';
                 if ($description || $this->hasMedia($message)) {
                     $info = $this->getMediaInfo($message);
                     $parsedMessage = [
@@ -51,11 +57,11 @@ class Messages {
                         'media' => [$info],
                         'preview' => [
                             [
-                                'href' => $info->url ?? null,
+                                'href' => $info['url'] ?? null,
                                 'image' => $this->getMediaUrl($message, $info, true),
-                            ]
+                            ],
                         ],
-                        'timestamp' => $message->date ?? '',
+                        'timestamp' => $message['date'] ?? '',
                     ];
 
                     if ($groupedMessages = array_reverse($groupedMessages)) {
@@ -73,13 +79,13 @@ class Messages {
                         $groupedMessages = [];
                     }
 
-                    if (!empty($message->media->webpage)) {
+                    if (!empty($message['media']['webpage'])) {
                         $parsedMessage['webpage'] = [
-                            'site_name' => $message->media->webpage->site_name ?? null,
-                            'title' => $message->media->webpage->title ?? null,
-                            'description' => $message->media->webpage->description ?? null,
+                            'site_name' => $message['media']['webpage']['site_name'] ?? null,
+                            'title' => $message['media']['webpage']['title'] ?? null,
+                            'description' => $message['media']['webpage']['description'] ?? null,
                             'preview' => reset($parsedMessage['preview'])['image'] ?? null,
-                            'url' => $message->media->webpage->url ?? null,
+                            'url' => $message['media']['webpage']['url'] ?? null,
                         ];
                         $parsedMessage['preview'] = [];
                     }
@@ -93,8 +99,8 @@ class Messages {
         return $this;
     }
 
-    private function setTitle(array $parsedMessage, \stdClass $message): array {
-
+    private function setTitle(array $parsedMessage, array $message): array
+    {
         $descriptionText = strip_tags($parsedMessage['description']);
 
         if (mb_strlen($descriptionText) > 50) {
@@ -103,21 +109,20 @@ class Messages {
 
             $parsedMessage['title'] = $matches['sentence'] ?? null;
             $parsedMessage['title'] = trim($parsedMessage['title']);
-
         }
 
-        if (!empty($message->media)) {
-            $mime = $message->media->document->mime_type ?? '';
-            if (strpos($mime, 'video') !== false) {
+        if (!empty($message['media'])) {
+            $mime = $message['media']['document']['mime_type'] ?? '';
+            if (str_contains($mime, 'video')) {
                 $parsedMessage['title'] = '[Video] ' . $parsedMessage['title'];
-            } elseif ($message->media->_ === 'messageMediaPhoto') {
+            } elseif ($message['media']['_'] === 'messageMediaPhoto') {
                 $parsedMessage['title'] = '[Photo] ' . $parsedMessage['title'];
             } else {
                 $parsedMessage['title'] = '[Media] ' . $parsedMessage['title'];
             }
         }
 
-        if ($message->_ === 'sponsoredMessage') {
+        if ($message['_'] === 'sponsoredMessage') {
             $parsedMessage['title'] = '[Sponsored] ' . $parsedMessage['title'];
         }
 
@@ -131,56 +136,52 @@ class Messages {
         return $parsedMessage;
     }
 
-    /**
-     * @param object $message
-     * @return string
-     */
-    private function getMessageUrl(object $message): string {
-        if ($message->_ === 'sponsoredMessage') {
-            $postId = !empty($message->channel_post) ? '/' .  $message->channel_post : '';
-            $startParam = !empty($message->start_param) ? '/?start=' . $message->start_param : '';
-            $peer = $message->peer->bot_api_id;
-            foreach ($message->peer as $property) {
-                if (property_exists($property, 'username')) {
-                    $peer = $property->username;
+    private function getMessageUrl(array $message): string
+    {
+        if ($message['_'] === 'sponsoredMessage') {
+            $postId = !empty($message['channel_post']) ? '/' . $message['channel_post'] : '';
+            $startParam = !empty($message['start_param']) ? '/?start=' . $message['start_param'] : '';
+            $peer = $message['peer']['bot_api_id'];
+            foreach ($message['peer'] as $property) {
+                if (!empty($property['username'])) {
+                    $peer = $property['username'];
                     break;
                 }
             }
             return self::TELEGRAM_URL . $peer . $postId . $startParam;
         } else {
-            return $this->channelUrl . $message->id;
+            return $this->channelUrl . $message['id'];
         }
     }
 
-    private function getMediaInfo($message): ?\stdClass {
+    private function getMediaInfo(array $message): ?array
+    {
         if (!$this->hasMedia($message)) {
             return null;
         }
-        if (!empty($message->media->webpage->photo)) {
-            $media = $message->media->webpage->photo;
+        if (!empty($message['media']['webpage']['photo'])) {
+            $media = $message['media']['webpage']['photo'];
         } else {
-            $media = $message->media;
+            $media = $message['media'];
         }
         $info = $this->client->getMediaInfo($media);
-        if (!empty($info->size) && !empty($info->mime)) {
-            $info->url = $this->getMediaUrl($message, $info, false);
+        if (!empty($info['size']) && !empty($info['mime'])) {
+            $info['url'] = $this->getMediaUrl($message, $info, false);
             return $info;
         }
 
         return null;
     }
 
-    private function hasMedia($message) {
+    private function hasMedia(array $message): bool
+    {
         if (
-            empty($message->media) ||
-            !in_array($message->media->{'_'}, static::MEDIA_TYPES, true) ||
+            empty($message['media'])
+            || !in_array($message['media']['_'], static::MEDIA_TYPES, true)
+            ||
             (
-                property_exists($message->media, 'photo') &&
-                empty($message->media->photo)
-            ) ||
-            (
-                !empty($message->media->webpage) &&
-                empty($message->media->webpage->photo)
+                !empty($message['media']['webpage']) &&
+                empty($message['media']['webpage']['photo'])
             )
         ) {
             return false;
@@ -189,19 +190,20 @@ class Messages {
         return true;
     }
 
-    private function getMediaUrl(\stdClass $message, ?\stdClass $info, bool $preview = false) {
+    private function getMediaUrl(array $message, ?array $info, bool $preview = false): ?string
+    {
         if (!$this->hasMedia($message)) {
             return null;
         }
 
         $url = Config::getInstance()->get('url');
-        $url .= "/media/{$this->username}/{$message->id}";
+        $url .= "/media/{$this->username}/{$message['id']}";
 
         if ($preview) {
             $url .= '/preview/thumb.jpeg';
-        } elseif (!empty($info->name) && !empty($info->ext)) {
-            $filename = mb_substr(trim($info->name), 0, 50);
-            $filename = urlencode("{$filename}{$info->ext}");
+        } elseif (!empty($info['name']) && !empty($info['ext'])) {
+            $filename = mb_substr(trim($info['name']), 0, 50);
+            $filename = urlencode("{$filename}{$info['ext']}");
             $url .= "/$filename";
         }
         return $url;
@@ -210,7 +212,8 @@ class Messages {
     /**
      * @return array
      */
-    public function get(): array {
+    public function get(): array
+    {
         return $this->list;
     }
 

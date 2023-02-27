@@ -1,4 +1,3 @@
-version: '3.5'
 services:
   telegram-rss:
     image: xtrime/telegram-rss:latest
@@ -11,7 +10,6 @@ services:
       - "127.0.0.1:9504:9504"
     volumes:
       - ./:/app-host-link
-    entrypoint: php server.php --docker
     working_dir: /app-host-link
     logging:
       driver: "json-file"

@@ -2,8 +2,12 @@
 
 namespace TelegramRSS\AccessControl;
 
-use OpenSwoole\Timer;
+use Revolt\EventLoop;
 use TelegramRSS\Config;
+
+use function Amp\ByteStream\splitLines;
+use function Amp\File\isFile;
+use function Amp\File\openFile;
 
 class AccessControl
 {
@@ -17,8 +21,8 @@ class AccessControl
         ROOT_DIR . '/cache/media-users.cache' => 'mediaUsers',
     ];
 
-    /** @var int Interval to remove old clients: 60 seconds */
-    private const CLEANUP_INTERVAL_MS = 60*1000;
+    /** @var float Interval to remove old clients: 60 seconds */
+    private const CLEANUP_INTERVAL_MS = 60.0;
     private int $rpmLimit;
     private int $errorsLimit;
 
@@ -40,7 +44,7 @@ class AccessControl
 
         $this->loadUsers();
 
-        Timer::tick(static::CLEANUP_INTERVAL_MS, function () {
+        EventLoop::repeat(static::CLEANUP_INTERVAL_MS, function () {
             $this->removeOldUsers();
             $this->saveUsers();
         });
@@ -63,21 +67,19 @@ class AccessControl
 
     private function saveUsers(): void {
         foreach (self::FILES as $path => $object) {
-            file_put_contents($path, '');
+            $descriptor = openFile($path, 'wb');
             foreach ($this->{$object} as $key => $value) {
-                file_put_contents($path, serialize([$key=>$value]) . PHP_EOL,FILE_APPEND);
+                $descriptor->write(serialize([$key=>$value]) . PHP_EOL);
             }
-
         }
     }
 
     private function loadUsers(): void {
         foreach (self::FILES as $path => $object) {
-            if(file_exists($path)) {
-                $file = fopen($path, 'rb');
-                while(!feof($file)) {
-                    $line = fgets($file);
-                    if ($line) {
+            if(isFile($path)) {
+                $file = openFile($path, 'rb');
+                while(!$file->eof()) {
+                    foreach (splitLines($file) as $line) {
                         $line = trim($line);
                         $item = unserialize($line, ['allowed_classes'=>[User::class]]);
                         $this->{$object}[array_key_first($item)] = reset($item);
@@ -93,20 +95,20 @@ class AccessControl
     {
         if ($type === 'media') {
             if (!isset($this->mediaUsers[$ip])) {
-                $this->mediaUsers[$ip] = new User(
-                    $this->clientsSettings[$ip]['media_rpm'] ?? $this->clientsSettings[$ip]['rpm'] ?? $this->mediaRpmLimit,
-                    $this->clientsSettings[$ip]['media_errors_limit'] ?? $this->clientsSettings[$ip]['errors_limit'] ?? $this->mediaErrorsLimit
-                );
+                $this->mediaUsers[$ip] = new User();
             }
+
+            $this->mediaUsers[$ip]->rpmLimit = $this->clientsSettings[$ip]['media_rpm'] ?? $this->clientsSettings[$ip]['rpm'] ?? $this->mediaRpmLimit;
+            $this->mediaUsers[$ip]->errorsLimit = $this->clientsSettings[$ip]['media_errors_limit'] ?? $this->clientsSettings[$ip]['errors_limit'] ?? $this->mediaErrorsLimit;
 
             return $this->mediaUsers[$ip];
         } else {
             if (!isset($this->users[$ip])) {
-                $this->users[$ip] = new User(
-                    $this->clientsSettings[$ip]['rpm'] ?? $this->rpmLimit,
-                    $this->clientsSettings[$ip]['errors_limit'] ?? $this->errorsLimit
-                );
+                $this->users[$ip] = new User();
             }
+
+            $this->users[$ip]->rpmLimit = $this->clientsSettings[$ip]['rpm'] ?? $this->rpmLimit;
+            $this->users[$ip]->errorsLimit = $this->clientsSettings[$ip]['errors_limit'] ?? $this->errorsLimit;
 
             return $this->users[$ip];
         }
