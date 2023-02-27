@@ -1,25 +1,29 @@
 <?php
 
-namespace TelegramRSS;
+namespace TelegramRSS\RSS;
 
 
-class RSS {
-    private string $title = 'Channel';
-    private const DESCRIPTION = 'Telegram public channel RSS feed';
-    private const LINK = 'https://tg.i-c-a.su';
+use TelegramRSS\Config;
+
+class Feed {
+    private string $title;
+    private string $description;
 
     private string $rss;
+    private string $link;
 
     /**
      * RSS constructor.
      * @param array $messages
      * @param string $peer
      */
-    public function __construct(array $messages, string $peer) {
+    public function __construct(array $messages, string $peer, array $info) {
         $url = Config::getInstance()->get('url');
         $selfLink = "$url/rss/" . urlencode($peer);
 
-        $this->title .= ": $peer";
+        $this->title = $info['Chat']['title'];
+        $this->description = $info['full']['about'];
+        $this->link = Config::getInstance()->get('url');
 
         $this->createRss($messages, $selfLink);
     }
@@ -43,8 +47,8 @@ class RSS {
         $xmlFeed->addChild('channel');
         //Required elements
         $xmlFeed->channel->addChild('title', $this->title);
-        $xmlFeed->channel->addChild('link', static::LINK);
-        $xmlFeed->channel->addChild('description', static::DESCRIPTION);
+        $xmlFeed->channel->addChild('link', $this->link);
+        $xmlFeed->channel->addChild('description', $this->description);
         $xmlFeed->channel->addChild('pubDate', $lastBuildDate);
         $xmlFeed->channel->addChild('lastBuildDate', $lastBuildDate);
 
@@ -107,11 +111,11 @@ class RSS {
                 $newItem->addChild('guid', $item['url']);
             }
             foreach ($item['media'] as $media) {
-                if (!empty($media->url)) {
+                if (!empty($media['url'])) {
                     $enclosure = $newItem->addChild('enclosure');
-                    $enclosure['url'] = $media->url;
-                    $enclosure['type'] = $media->mime;
-                    $enclosure['length'] = $media->size;
+                    $enclosure['url'] = $media['url'];
+                    $enclosure['type'] = $media['mime'];
+                    $enclosure['length'] = $media['size'];
                     unset($enclosure);
                 }
             }

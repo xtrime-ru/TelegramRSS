@@ -1,6 +1,7 @@
 FROM xtrime/telegram-rss:latest
 
-RUN pecl install xdebug
+RUN pecl install xdebug \
+	&& echo "zend_extension=xdebug.so" >> "$PHP_INI_DIR/conf.d/xdebug.ini"
 
 EXPOSE 9504
 

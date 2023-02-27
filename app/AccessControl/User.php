@@ -14,7 +14,7 @@ class User
     public array $errors = [];
 
     private bool $permanentBan = false;
-    private int $banLastDuration = 0;
+    public int $banLastDuration = 0;
     private int $banUntilTs = 0;
 
 
@@ -97,7 +97,7 @@ class User
 
     public function addBan(): void
     {
-        if ($this->permanentBan) {
+        if ($this->isBanned()) {
             return;
         }
 

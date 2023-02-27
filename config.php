@@ -10,6 +10,12 @@ if (
     );
 }
 
+if (getenv('SERVER_ADDRESS') === false) {
+    throw new RuntimeException(
+        'Please update .env or .env.docker. Check .env.example .env.docker.example for changes.'
+    );
+}
+
 $clientsSettings = json_decode(getenv("CLIENTS_SETTINGS"), true, 5, JSON_THROW_ON_ERROR);
 
 if ($options['docker'] && isset($clientsSettings['127.0.0.1'])) {
@@ -22,22 +28,13 @@ if ($options['docker'] && isset($clientsSettings['127.0.0.1'])) {
 
 return [
     'url' => (string) getenv('SELF_URL'),
-    'swoole' => [
-        'server' => [
-            'address' => (string) (getenv('SWOOLE_SERVER_ADDRESS') ?? '127.0.0.1'),
-            'port' => (string) (getenv('SWOOLE_SERVER_PORT') ?? '9504'),
-        ],
-        'options' => [
-            'worker_num' => (int) (getenv('SWOOLE_WORKER_NUM') ?? 1),
-            'http_compression' => (bool) (getenv('SWOOLE_HTTP_COMPRESSION') ?? true),
-        ],
+    'server' => [
+        'address' => (string) (getenv('SERVER_ADDRESS') ?? '127.0.0.1'),
+        'port' => (string) (getenv('SERVER_PORT') ?? '9504'),
     ],
     'client' => [
         'address' => (string) (getenv('TELEGRAM_CLIENT_ADDRESS') ?? '127.0.0.1'),
         'port' => (string) (getenv('TELEGRAM_CLIENT_PORT') ?? '9503'),
-    ],
-    'media' => [
-        'max_size' => (int) getenv('MAX_MEDIA_SIZE'),
     ],
     'access' => [
         'rpm' => (int) getenv('RPM'),
@@ -52,5 +49,6 @@ return [
     'log' => [
         'dir' => (string) getenv('LOGS_DIR'),
         'file' => (string) getenv('LOGS_FILE'),
+        'level' => (int) getenv('LOGS_LEVEL'),
     ],
 ];
