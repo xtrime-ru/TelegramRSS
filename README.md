@@ -64,13 +64,23 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
     ```
   
 ## Examples    
-* https://tg.i-c-a.su/json/breakingmash
-* https://tg.i-c-a.su/rss/breakingmash
-* Custom limit: https://tg.i-c-a.su/rss/breakingmash?limit=50 
+### JSON
+* URL: https://tg.i-c-a.su/json/breakingmash
+* Custom limit: https://tg.i-c-a.su/json/breakingmash?limit=50 
   
   Maximum: 100 posts
   
+* Pagination: https://tg.i-c-a.su/json/breakingmash?page=2
+
+### RSS
+* URL: https://tg.i-c-a.su/rss/breakingmash
+* Custom limit: https://tg.i-c-a.su/json/breakingmash?limit=50 
+
+  Maximum: 100 posts
+  
 * Pagination: https://tg.i-c-a.su/rss/breakingmash/2
+
+### Media
 * https://tg.i-c-a.su/media/breakingmash/10738/preview
 * https://tg.i-c-a.su/media/breakingmash/10738
 
