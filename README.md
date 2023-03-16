@@ -74,7 +74,7 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 
 ### RSS
 * URL: https://tg.i-c-a.su/rss/breakingmash
-* Custom limit: https://tg.i-c-a.su/json/breakingmash?limit=50 
+* Custom limit: https://tg.i-c-a.su/rss/breakingmash?limit=50 
 
   Maximum: 100 posts
   
