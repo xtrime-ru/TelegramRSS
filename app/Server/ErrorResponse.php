@@ -2,6 +2,7 @@
 
 namespace TelegramRSS\Server;
 
+use Amp\Http\HttpStatus;
 use Amp\Http\Server\ErrorHandler;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\Response;
@@ -16,6 +17,9 @@ class ErrorResponse implements ErrorHandler
     }
 
     public static function customError(int $status, array $errors) {
+        if ($status < 300 || $status > 599) {
+            $status = HttpStatus::BAD_REQUEST;
+        }
         $response = new Response(
             $status,
             Server::JSON_HEADER,

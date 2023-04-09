@@ -47,7 +47,7 @@ class AuthorizationMiddleware implements Middleware
             }
 
             if ($user->isBanned()) {
-                throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", 403);
+                throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::FORBIDDEN);
             }
         } catch (\Throwable $e) {
             $errors = array_merge($user->errors, [$e->getMessage()]);
