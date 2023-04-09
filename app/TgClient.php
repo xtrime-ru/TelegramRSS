@@ -7,6 +7,8 @@ use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
 use Amp\Http\Client\Response;
+use Amp\Http\HttpResponse;
+use Amp\Http\HttpStatus;
 use UnexpectedValueException;
 
 use function Amp\delay;
@@ -49,7 +51,7 @@ class TgClient
         return self::getContents($this->get('getHistoryHtml', ['data' => $data]));
     }
 
-    public function getMedia(array $data, array $headers): Response
+    public function getMedia(array $data, array $headers): HttpResponse
     {
         $data = array_merge(
             [
@@ -63,7 +65,7 @@ class TgClient
         return $this->get('getMedia', ['data' => $data], $headers, 'media');
     }
 
-    public function getMediaPreview(array $data, array $headers): Response
+    public function getMediaPreview(array $data, array $headers): HttpResponse
     {
         $data = array_merge(
             [
@@ -128,7 +130,7 @@ class TgClient
         array $headers = [],
         string $responseType = 'json',
         int $retry = 0
-    ): Response {
+    ): HttpResponse {
         unset(
             $headers['host'],
             $headers['remote_addr'],
@@ -175,6 +177,9 @@ class TgClient
                 return $this->get($method, $parameters, $headers, $responseType, ++$retry);
             }
             if ($errorMessage) {
+                if ($errorMessage === 'Message has no preview' || $errorMessage === 'Empty preview') {
+                    return new \Amp\Http\Server\Response(HttpStatus::TEMPORARY_REDIRECT, ['location' => '/no-image.jpg']);
+                }
                 throw new UnexpectedValueException($errorMessage, $errorCode);
             }
             throw new UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, $response->getStatus());
