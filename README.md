@@ -4,7 +4,7 @@ RSS/JSON generator for telegram
 Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiServer) and output them as RSS or JSON.
 
 ## Features
-* Fast async Swoole server
+* Fast async [amphp](https://github.com/amphp/) http server
 * Use as micro-service to access Telegram API
 * Get any public telegram posts from groups as json or RSS
 * fail2ban, RPM limits, IP blacklist
@@ -15,28 +15,24 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 ![Architecture Example](https://hsto.org/webt/j-/ob/ky/j-obkye1dv68ngsrgi12qevutra.png)
 
 ## Installation
- 
+
+1. Install docker  
+    ```shell
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh ./get-docker.sh --dry-run
+   ```
 1. Install and start [Telegram Api Server](https://github.com/xtrime-ru/TelegramApiServer)
-1. Clone this project: `git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS`
-1. Start:
-    * Docker: 
-        1. `docker-compose pull`
-        2. `docker-compose up -d`
-  
-    * Manual:
-        1. [Install Swoole php extension](https://github.com/swoole/swoole-src#%EF%B8%8F-installation)
-        1. `composer install -o --no-dev`
-        1. `php server.php`
+1. Install and start
+    ```shell 
+    git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS
+    cd TelegramRSS
+    docker compose pull
+    docker compose up -d
+    ```
    
-## Setup
-1. Edit `.env` or `.env.docker` if needed. 
-1. Restart RSS server.
-    * Docker: 
-        1. `docker-compose restart`
-    * Manual:
-        1. ctrl + c
-        1. `php server.php`
-1. [Run in background](https://github.com/xtrime-ru/TelegramApiServer#run-in-background)
+## Additional steps
+1. Edit `.env.docker` if needed. 
+1. Restart RSS server `docker compose restart`
 1. Example of Nginx config 
     ```
     server {
