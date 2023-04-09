@@ -46,9 +46,9 @@ class Feed {
 
         $xmlFeed->addChild('channel');
         //Required elements
-        $xmlFeed->channel->addChild('title', $this->title);
+        $xmlFeed->channel->addChild('title', htmlspecialchars($this->title));
         $xmlFeed->channel->addChild('link', $this->link);
-        $xmlFeed->channel->addChild('description', $this->description);
+        $xmlFeed->channel->addChild('description', htmlspecialchars($this->description));
         $xmlFeed->channel->addChild('pubDate', $lastBuildDate);
         $xmlFeed->channel->addChild('lastBuildDate', $lastBuildDate);
 

@@ -52,7 +52,7 @@ class Messages
                     $info = $this->getMediaInfo($message);
                     $parsedMessage = [
                         'url' => $this->getMessageUrl($message),
-                        'title' => null,
+                        'title' => '',
                         'description' => $description,
                         'media' => [$info],
                         'preview' => [
@@ -82,7 +82,7 @@ class Messages
                     if (!empty($message['media']['webpage'])) {
                         $parsedMessage['webpage'] = [
                             'site_name' => $message['media']['webpage']['site_name'] ?? null,
-                            'title' => $message['media']['webpage']['title'] ?? null,
+                            'title' => $message['media']['webpage']['title'] ?? '',
                             'description' => $message['media']['webpage']['description'] ?? null,
                             'preview' => reset($parsedMessage['preview'])['image'] ?? null,
                             'url' => $message['media']['webpage']['url'] ?? null,
@@ -107,7 +107,7 @@ class Messages
             //Get first sentence from decription
             preg_match('/(?<sentence>.*?\b\W*(?:\.|\?|\!|\n))/ui', $descriptionText, $matches);
 
-            $parsedMessage['title'] = $matches['sentence'] ?? null;
+            $parsedMessage['title'] = $matches['sentence'] ?? '';
             $parsedMessage['title'] = trim($parsedMessage['title']);
         }
 
