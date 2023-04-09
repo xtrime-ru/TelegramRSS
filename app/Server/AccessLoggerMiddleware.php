@@ -23,13 +23,18 @@ class AccessLoggerMiddleware implements Middleware
         $client = $request->getClient();
 
         $local = $client->getLocalAddress()->toString();
-        $remote = $client->getRemoteAddress()->toString();
+        $remote = $request->getHeader('x-real-ip')
+            ??
+            $request->getHeader('x-forwarded-for')
+            ??
+            explode(':', $client->getRemoteAddress()->toString())[0]
+        ;
         $method = $request->getMethod();
-        $uri = (string) $request->getUri();
+        $uri = (string)$request->getUri();
         $protocolVersion = $request->getProtocolVersion();
 
         $user = $this->accessControl->getOrCreateUser(
-            explode(':', $remote)[0],
+            $remote,
             str_contains($uri, '/media/') ? 'media' : 'default'
         );
 
@@ -49,13 +54,16 @@ class AccessLoggerMiddleware implements Middleware
         try {
             $response = $requestHandler->handleRequest($request);
         } catch (\Throwable $exception) {
-            $this->logger->warning(\sprintf(
-                'Client exception for "%s %s" HTTP/%s %s',
-                $method,
-                $uri,
-                $protocolVersion,
-                $remote,
-            ), $context);
+            $this->logger->warning(
+                \sprintf(
+                    'Client exception for "%s %s" HTTP/%s %s',
+                    $method,
+                    $uri,
+                    $protocolVersion,
+                    $remote,
+                ),
+                $context
+            );
 
             throw $exception;
         }
@@ -68,21 +76,25 @@ class AccessLoggerMiddleware implements Middleware
             'response' => [
                 'status' => $status,
                 'reason' => $reason,
-            ]
+            ],
         ];
 
         $level = $status < 400 ? LogLevel::INFO : LogLevel::NOTICE;
 
-        $this->logger->log($level, \sprintf(
-            '"%s %s" %d "%s" HTTP/%s %s on %s',
-            $method,
-            $uri,
-            $status,
-            $reason,
-            $protocolVersion,
-            $remote,
-            $local,
-        ), $context);
+        $this->logger->log(
+            $level,
+            \sprintf(
+                '"%s %s" %d "%s" HTTP/%s %s on %s',
+                $method,
+                $uri,
+                $status,
+                $reason,
+                $protocolVersion,
+                $remote,
+                $local,
+            ),
+            $context
+        );
 
         return $response;
     }
