@@ -2,16 +2,15 @@
 
 namespace TelegramRSS\Server;
 
-use Amp\Http\Server\Driver\ConnectionLimitingClientFactory;
 use Amp\Http\Server\Driver\ConnectionLimitingServerSocketFactory;
 use Amp\Http\Server\Driver\DefaultHttpDriverFactory;
 use Amp\Http\Server\Driver\SocketClientFactory;
 use Amp\Http\Server\SocketHttpServer;
 use Amp\Socket\InternetAddress;
 use Amp\Sync\LocalSemaphore;
-use TelegramRSS\TgClient;
 use TelegramRSS\Config;
 use TelegramRSS\Logger;
+use TelegramRSS\TgClient;
 
 use function Amp\trapSignal;
 
@@ -36,7 +35,7 @@ final class Server
                 logger: Logger::getInstance(),
                 streamTimeout: 600,
                 connectionTimeout: 5,
-                bodySizeLimit: 5 * (1024 ** 3), //5Gb
+                bodySizeLimit: 5 * (1024 ** 3) // 5G
             )
         );
 

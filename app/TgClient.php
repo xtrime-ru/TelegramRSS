@@ -9,6 +9,7 @@ use Amp\Http\Client\Request;
 use Amp\Http\Client\Response;
 use Amp\Http\HttpResponse;
 use Amp\Http\HttpStatus;
+use Amp\Http\Server\Response as ServerResponse;
 use UnexpectedValueException;
 
 use function Amp\delay;
@@ -130,7 +131,7 @@ class TgClient
         array $headers = [],
         string $responseType = 'json',
         int $retry = 0
-    ): HttpResponse {
+    ): Response|ServerResponse {
         unset(
             $headers['host'],
             $headers['remote_addr'],
@@ -153,16 +154,16 @@ class TgClient
             json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE)
         );
         $request->setHeaders(array_merge(['Content-Type' => 'application/json'], $headers));
-        $request->setTransferTimeout(600);
-        $request->setBodySizeLimit(5 * (1024 ** 3)); // 5Gb
+        $request->setTransferTimeout(600.0);
+        $request->setInactivityTimeout(60.0);
+        $request->setBodySizeLimit(bodySizeLimit: 5 * (1024 ** 3)); // 5G
         $request->setTcpConnectTimeout(0.1);
         $request->setTlsHandshakeTimeout(0.1);
         try {
             $response = $this->client->request($request);
         } catch (\Throwable $e) {
-            throw new UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, 500, $e);
+            return $this->get($method, $parameters, $headers, $responseType, ++$retry);
         }
-
 
         if (!in_array($response->getStatus(), [200, 206, 302], true)) {
             $errorMessage = '';
@@ -178,7 +179,7 @@ class TgClient
             }
             if ($errorMessage) {
                 if ($errorMessage === 'Message has no preview' || $errorMessage === 'Empty preview') {
-                    return new \Amp\Http\Server\Response(HttpStatus::TEMPORARY_REDIRECT, ['location' => '/no-image.jpg']);
+                    return new ServerResponse(HttpStatus::TEMPORARY_REDIRECT, ['location' => '/no-image.jpg']);
                 }
                 throw new UnexpectedValueException($errorMessage, $errorCode);
             }
@@ -188,7 +189,7 @@ class TgClient
         return $response;
     }
 
-    private static function getContents(Response $response): array|string
+    private static function getContents(Response|ServerResponse $response): array|string
     {
         $data = [];
         if (str_contains($response->getHeader('Content-Type'), 'application/json')) {
