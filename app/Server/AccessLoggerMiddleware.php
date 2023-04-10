@@ -45,7 +45,7 @@ class AccessLoggerMiddleware implements Middleware
             'remote' => $remote,
             'rpm' => $user->rpm,
             'rpm_limit' => $user->rpmLimit,
-            'errors' => $user->errors,
+            'errors' => count($user->errors),
             'errors_limit' => $user->errorsLimit,
             'previous_ban' => $user->banLastDuration,
             'banned' => (int)$user->isBanned(),

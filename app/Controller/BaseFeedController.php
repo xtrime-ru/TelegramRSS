@@ -25,7 +25,7 @@ abstract class BaseFeedController implements RequestHandler
 
     protected function getLimit(Request $request): int
     {
-        $limit = (int)($request->getAttributes()['limit'] ?? self::LIMIT_DEFAULT);
+        $limit = (int)($request->getQueryParameter('limit') ?? self::LIMIT_DEFAULT);
         return max(1, min($limit, self::LIMIT_MAX));
     }
 
