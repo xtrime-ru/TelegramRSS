@@ -68,7 +68,7 @@ class Messages
                         foreach ($groupedMessages as $media) {
                             $info = $this->getMediaInfo($media);
                             $preview = [
-                                'href' => $info->url ?? null,
+                                'href' => $info['url'] ?? null,
                                 'image' => $this->getMediaUrl($media, $info, true),
                             ];
                             if ($preview['href'] && $preview['image']) {
@@ -105,7 +105,7 @@ class Messages
 
         if (mb_strlen($descriptionText) > 50) {
             //Get first sentence from decription
-            preg_match('/(?<sentence>.*?\b\W*(?:\.|\?|\!|\n))/ui', $descriptionText, $matches);
+            preg_match('/(?<sentence>.*?\b\W*[.?!;\n])/ui', $descriptionText, $matches);
 
             $parsedMessage['title'] = $matches['sentence'] ?? '';
             $parsedMessage['title'] = trim($parsedMessage['title']);
