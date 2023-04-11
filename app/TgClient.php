@@ -17,7 +17,7 @@ use function Amp\delay;
 class TgClient
 {
     private const RETRY = 5;
-    private const RETRY_INTERVAL = 3;
+    private const RETRY_INTERVAL = 0;
     private ?bool $isPremium = null;
     public const MESSAGE_CLIENT_UNAVAILABLE = 'Telegram connection error...';
     private string $apiUrl;
@@ -142,6 +142,9 @@ class TgClient
             $headers['accept-encoding'],
         );
         if ($retry) {
+            if ($retry >= static::RETRY) {
+                throw new UnexpectedValueException(static::MESSAGE_CLIENT_UNAVAILABLE, 500);
+            }
             //Делаем попытку реконекта
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Logger::getInstance()->warning('Client crashed and restarting. Resending request.');
@@ -174,7 +177,7 @@ class TgClient
                 $errorCode = $data['errors'][0]['code'] ?? $errorCode;
             }
 
-            if (!$errorMessage && $retry < static::RETRY) {
+            if (!$errorMessage) {
                 return $this->get($method, $parameters, $headers, $responseType, ++$retry);
             }
             if ($errorMessage) {
