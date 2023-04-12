@@ -22,9 +22,15 @@ class RequestValidatorMiddleware implements Middleware
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
     {
-        $request->setAttribute('channel', self::getChannel($request));
-        $this->validatePeer($request);
-        return $requestHandler->handleRequest($request);
+        $channel = self::getChannel($request);
+        $request->setAttribute('channel', $channel);
+        try {
+            $this->validatePeer($request);
+            return $requestHandler->handleRequest($request);
+        } catch (\Throwable $exception) {
+            ForbiddenPeers::add($channel, $exception->getMessage());
+            throw $exception;
+        }
     }
 
     public static function getChannel(Request $request): string

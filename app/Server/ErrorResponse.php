@@ -6,7 +6,6 @@ use Amp\Http\HttpStatus;
 use Amp\Http\Server\ErrorHandler;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\Response;
-use Amp\Http\Server\Trailers;
 
 class ErrorResponse implements ErrorHandler
 {

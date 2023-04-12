@@ -29,8 +29,10 @@ final class ForbiddenPeers
             case 'BOTS NOT ALLOWED':
             case 'This is not a public channel':
                 $peer = mb_strtolower($peer);
-                self::$peers[$peer] = $error;
-                self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
+                if ((self::$peers[$peer] ?? null) !== $error) {
+                    self::$peers[$peer] = $error;
+                    self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
+                }
                 break;
         }
     }
