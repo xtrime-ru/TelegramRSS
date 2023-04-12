@@ -40,8 +40,8 @@ class Router
             new RequestValidatorMiddleware($client),
         ];
         foreach (['GET', 'POST'] as $method) {
-            $this->router->addRoute($method, '/json/{channel}[/{page}[/]]', stack(new JsonController($client), ...$middlewares));
-            $this->router->addRoute($method, '/rss/{channel}[/{page}[/]]', stack(new RSSController($client), ...$middlewares));
+            $this->router->addRoute($method, '/json/{channel}[/[{page}[/]]]', stack(new JsonController($client), ...$middlewares));
+            $this->router->addRoute($method, '/rss/{channel}[/[{page}[/]]]', stack(new RSSController($client), ...$middlewares));
             $this->router->addRoute($method, '/media/{channel}/{message_id}[/[{preview}[/[{filename}]]]]', stack(new MediaController($client), ...$middlewares));
         }
     }
