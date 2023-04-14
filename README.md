@@ -29,7 +29,17 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
     docker compose pull
     docker compose up -d
     ```
-   
+
+## Upgrade from v1 to v2
+```shell
+git pull
+docker compose pull
+cp .env.docker .env.docker.v1
+cat .env.docker.example > .env.docker
+#check new config and move old options from your .env.docker.v1 to new .env.docker
+docker compose up -d
+```
+
 ## Additional steps
 1. Edit `.env.docker` if needed. 
 1. Restart RSS server `docker compose restart`
