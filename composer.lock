@@ -478,12 +478,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/http.git",
-                "reference": "90b524d58461c0a47e18d15a9cdce3ebb2f94166"
+                "reference": "fe1d018a53cfbd77fa794b3cb15a215c1f2696f0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/http/zipball/90b524d58461c0a47e18d15a9cdce3ebb2f94166",
-                "reference": "90b524d58461c0a47e18d15a9cdce3ebb2f94166",
+                "url": "https://api.github.com/repos/amphp/http/zipball/fe1d018a53cfbd77fa794b3cb15a215c1f2696f0",
+                "reference": "fe1d018a53cfbd77fa794b3cb15a215c1f2696f0",
                 "shasum": ""
             },
             "require": {
@@ -491,7 +491,7 @@
                 "amphp/parser": "^1.1",
                 "league/uri-components": "^2.4",
                 "php": ">=8.1",
-                "psr/http-message": "^1"
+                "psr/http-message": "^1 || ^2"
             },
             "require-dev": {
                 "amphp/php-cs-fixer-config": "^2",
@@ -527,7 +527,7 @@
             "description": "Basic HTTP primitives which can be shared by servers and clients.",
             "support": {
                 "issues": "https://github.com/amphp/http/issues",
-                "source": "https://github.com/amphp/http/tree/v2.0.0-beta.3"
+                "source": "https://github.com/amphp/http/tree/2.x"
             },
             "funding": [
                 {
@@ -535,20 +535,20 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-04-08T14:32:00+00:00"
+            "time": "2023-04-13T22:30:27+00:00"
         },
         {
             "name": "amphp/http-client",
-            "version": "v5.0.0-beta.10",
+            "version": "v5.0.0-beta.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/http-client.git",
-                "reference": "1e1fc7d70023f62aa35f85531ef00cf3aaa0b222"
+                "reference": "0fd30c4ff2231b044ead0e7a5d3aedafcbca59b1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/http-client/zipball/1e1fc7d70023f62aa35f85531ef00cf3aaa0b222",
-                "reference": "1e1fc7d70023f62aa35f85531ef00cf3aaa0b222",
+                "url": "https://api.github.com/repos/amphp/http-client/zipball/0fd30c4ff2231b044ead0e7a5d3aedafcbca59b1",
+                "reference": "0fd30c4ff2231b044ead0e7a5d3aedafcbca59b1",
                 "shasum": ""
             },
             "require": {
@@ -560,13 +560,14 @@
                 "amphp/socket": "^2",
                 "amphp/sync": "^2",
                 "league/uri": "^6",
+                "league/uri-components": "^2.4",
                 "php": ">=8.1",
                 "psr/http-message": "^1",
                 "revolt/event-loop": "^1"
             },
             "require-dev": {
                 "amphp/file": "^3",
-                "amphp/http-server": "^3",
+                "amphp/http-server": "^3-dev",
                 "amphp/php-cs-fixer-config": "^2",
                 "amphp/phpunit-util": "^3",
                 "ext-json": "*",
@@ -624,7 +625,7 @@
             ],
             "support": {
                 "issues": "https://github.com/amphp/http-client/issues",
-                "source": "https://github.com/amphp/http-client/tree/v5.0.0-beta.10"
+                "source": "https://github.com/amphp/http-client/tree/v5.0.0-beta.11"
             },
             "funding": [
                 {
@@ -632,7 +633,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-04-09T15:03:50+00:00"
+            "time": "2023-04-13T05:19:15+00:00"
         },
         {
             "name": "amphp/http-server",
@@ -640,12 +641,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/amphp/http-server.git",
-                "reference": "76c48d8e5295f2cf20b41fc3dfccc7cb6ae9bb4d"
+                "reference": "d416c118cdf2efaeb5fcdbb05b0af6326909a863"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amphp/http-server/zipball/76c48d8e5295f2cf20b41fc3dfccc7cb6ae9bb4d",
-                "reference": "76c48d8e5295f2cf20b41fc3dfccc7cb6ae9bb4d",
+                "url": "https://api.github.com/repos/amphp/http-server/zipball/d416c118cdf2efaeb5fcdbb05b0af6326909a863",
+                "reference": "d416c118cdf2efaeb5fcdbb05b0af6326909a863",
                 "shasum": ""
             },
             "require": {
@@ -730,7 +731,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-04-09T16:12:16+00:00"
+            "time": "2023-04-14T03:46:50+00:00"
         },
         {
             "name": "amphp/http-server-router",
