@@ -68,6 +68,7 @@ docker compose up -d
     
     }
     ```
+   Set `REAL_IP_HEADER=X-Forwarded-For` in .env.docker to retrieve client IP from nginx.
   
 ## Examples    
 ### JSON

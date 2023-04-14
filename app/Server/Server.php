@@ -74,6 +74,11 @@ final class Server
         $realIpHeader = Config::getInstance()->get('server.real_ip_header');
         if ($realIpHeader) {
             $remote = $request->getHeader($realIpHeader);
+            if (!$remote) {
+                throw new \InvalidArgumentException("Empty header: $realIpHeader");
+            }
+            $tmp = explode(',', $remote);
+            $remote = trim(end($tmp));
         } else {
             $remote = $request->getClient()->getRemoteAddress()->toString();
             $hostArray = explode(':', $remote);
