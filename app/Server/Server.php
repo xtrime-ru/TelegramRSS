@@ -75,7 +75,15 @@ final class Server
         if ($realIpHeader) {
             $remote = $request->getHeader($realIpHeader);
         } else {
-            $remote = explode(':', $request->getClient()->getRemoteAddress()->toString())[0];
+            $remote = $request->getClient()->getRemoteAddress()->toString();
+            $hostArray = explode(':', $remote);
+            if (count($hostArray) >= 2) {
+                $port = (int)array_pop($hostArray);
+                if ($port > 0 && $port <= 65353) {
+                    $remote = implode(':', $hostArray);
+                }
+            }
+
         }
 
         return $remote;
