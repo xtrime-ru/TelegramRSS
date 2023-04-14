@@ -5,6 +5,7 @@ namespace TelegramRSS\Server;
 use Amp\Http\Server\Driver\ConnectionLimitingServerSocketFactory;
 use Amp\Http\Server\Driver\DefaultHttpDriverFactory;
 use Amp\Http\Server\Driver\SocketClientFactory;
+use Amp\Http\Server\Request;
 use Amp\Http\Server\SocketHttpServer;
 use Amp\Socket\InternetAddress;
 use Amp\Sync\LocalSemaphore;
@@ -66,6 +67,18 @@ final class Server
             info(\sprintf("Received signal %d, stopping HTTP server", $signal));
             $server->stop();
         }
+    }
+
+    public static function getClientIp(Request $request): string
+    {
+        $realIpHeader = Config::getInstance()->get('server.real_ip_header');
+        if ($realIpHeader) {
+            $remote = $request->getHeader($realIpHeader);
+        } else {
+            $remote = explode(':', $request->getClient()->getRemoteAddress()->toString())[0];
+        }
+
+        return $remote;
     }
 
 }

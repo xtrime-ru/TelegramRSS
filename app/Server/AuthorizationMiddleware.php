@@ -28,12 +28,7 @@ class AuthorizationMiddleware implements Middleware
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
     {
-        $host = $request->getHeader('x-real-ip')
-            ??
-            $request->getHeader('x-forwarded-for')
-            ??
-            explode(':', $request->getClient()->getRemoteAddress()->toString())[0]
-        ;
+        $host = Server::getClientIp($request);
 
         $user = $this->accessControl->getOrCreateUser(
             $host,

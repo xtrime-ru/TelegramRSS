@@ -20,15 +20,8 @@ class AccessLoggerMiddleware implements Middleware
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
     {
-        $client = $request->getClient();
+        $remote = Server::getClientIp($request);
 
-        $local = $client->getLocalAddress()->toString();
-        $remote = $request->getHeader('x-real-ip')
-            ??
-            $request->getHeader('x-forwarded-for')
-            ??
-            explode(':', $client->getRemoteAddress()->toString())[0]
-        ;
         $method = $request->getMethod();
         $uri = (string)$request->getUri();
         $protocolVersion = $request->getProtocolVersion();
@@ -84,14 +77,13 @@ class AccessLoggerMiddleware implements Middleware
         $this->logger->log(
             $level,
             \sprintf(
-                '"%s %s" %d "%s" HTTP/%s %s on %s',
+                '"%s %s" %d "%s" HTTP/%s %s',
                 $method,
                 $uri,
                 $status,
                 $reason,
                 $protocolVersion,
                 $remote,
-                $local,
             ),
             $context
         );
