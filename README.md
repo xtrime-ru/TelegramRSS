@@ -30,7 +30,7 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
     docker compose up -d
     ```
 
-## Upgrade from v1 to v2
+## Upgrade to v4
 ```shell
 git pull
 docker compose pull
