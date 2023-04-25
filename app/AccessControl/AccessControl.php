@@ -82,7 +82,12 @@ class AccessControl
                     foreach (splitLines($file) as $line) {
                         $line = trim($line);
                         $item = unserialize($line, ['allowed_classes'=>[User::class]]);
-                        $this->{$object}[array_key_first($item)] = reset($item);
+                        if (is_array($item)) {
+                            foreach ($item as $ip => $user) {
+                                $this->{$object}[$ip] = $user;
+                            }
+                        }
+
                     }
                 }
             } else {
