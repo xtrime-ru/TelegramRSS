@@ -75,11 +75,12 @@ final class Server
         if ($realIpHeader) {
             $remote = $request->getHeader($realIpHeader);
             if (!$remote) {
-                throw new \InvalidArgumentException("Empty header: $realIpHeader");
+                GOTO DIRECT;
             }
             $tmp = explode(',', $remote);
             $remote = trim(end($tmp));
         } else {
+            DIRECT:
             $remote = $request->getClient()->getRemoteAddress()->toString();
             $hostArray = explode(':', $remote);
             if (count($hostArray) >= 2) {
