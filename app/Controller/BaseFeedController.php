@@ -19,7 +19,11 @@ abstract class BaseFeedController implements RequestHandler
 
     protected function getPage(Request $request): int
     {
-        $page = (int)($request->getAttribute(Router::class)['page'] ?? 1);
+        $page = (int)(
+            $request->getAttribute(Router::class)['page']
+            ?? $request->getQueryParameter('page')
+            ?: 1
+        );
         return max(1, $page);
     }
 
