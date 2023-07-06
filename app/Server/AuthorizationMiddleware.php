@@ -11,7 +11,6 @@ use Amp\Http\Server\Response;
 use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\TgClient;
 use TelegramRSS\Config;
-use TelegramRSS\Controller\MediaController;
 
 class AuthorizationMiddleware implements Middleware
 {
@@ -52,7 +51,7 @@ class AuthorizationMiddleware implements Middleware
         try {
             $response = $requestHandler->handleRequest($request);
         } catch (\Throwable $e) {
-            if ($e->getMessage() !== TgClient::MESSAGE_CLIENT_UNAVAILABLE) {
+            if (!self::isErrorAllowed($e->getMessage())) {
                 $user->addError($e->getMessage(), (string)$request->getUri());
             }
             $errors = array_merge($user->errors, [$e->getMessage()]);
@@ -76,5 +75,12 @@ class AuthorizationMiddleware implements Middleware
             return false;
         }
         return true;
+    }
+
+    private static function isErrorAllowed(string $error):bool {
+        return
+            $error == TgClient::MESSAGE_CLIENT_UNAVAILABLE
+            || str_starts_with($error, 'FLOOD_WAIT')
+        ;
     }
 }
