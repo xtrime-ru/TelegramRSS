@@ -1,4 +1,4 @@
-FROM xtrime/telegram-rss:latest
+FROM xtrime/telegram-api-server:latest
 
 RUN pecl install xdebug \
 	&& echo "zend_extension=xdebug.so" >> "$PHP_INI_DIR/conf.d/xdebug.ini"

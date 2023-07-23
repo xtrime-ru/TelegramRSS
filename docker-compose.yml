@@ -1,9 +1,6 @@
 services:
   telegram-rss:
-    image: xtrime/telegram-rss:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: xtrime/telegram-api-server:latest
     container_name: telegram-rss
     restart: unless-stopped
     ports:
@@ -11,6 +8,7 @@ services:
     volumes:
       - ./:/app-host-link
     working_dir: /app-host-link
+    entrypoint: php server.php --docker
     logging:
       driver: "json-file"
       options:
