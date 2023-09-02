@@ -6,6 +6,9 @@ namespace TelegramRSS\RSS;
 use TelegramRSS\Config;
 use TelegramRSS\TgClient;
 
+use function Amp\async;
+use function Amp\Future\await;
+
 class Messages
 {
     private const TELEGRAM_URL = 'https://t.me/';
@@ -38,6 +41,12 @@ class Messages
             $messages = array_merge($this->telegramResponse['sponsored_messages'] ?? [], $messages);
 
             $groupedMessages = [];
+            $futures = [];
+            foreach ($messages as $message) {
+                $futures[$message['id']] = async($this->getMediaInfo(...), $message);
+            }
+            $messagesInfo = await($futures);
+
             foreach ($messages as $key => $message) {
                 if (
                     !empty($message['grouped_id']) &&
@@ -49,7 +58,7 @@ class Messages
                 }
                 $description = $message['message'] ?? '';
                 if ($description || $this->hasMedia($message)) {
-                    $info = $this->getMediaInfo($message);
+                    $info = $messagesInfo[$message['id']];
                     $parsedMessage = [
                         'url' => $this->getMessageUrl($message),
                         'title' => '',
@@ -66,7 +75,7 @@ class Messages
 
                     if ($groupedMessages = array_reverse($groupedMessages)) {
                         foreach ($groupedMessages as $media) {
-                            $info = $this->getMediaInfo($media);
+                            $info = $messagesInfo[$media['id']];
                             $preview = [
                                 'href' => $info['url'] ?? null,
                                 'image' => $this->getMediaUrl($media, $info, true),
