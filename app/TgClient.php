@@ -12,7 +12,9 @@ use Amp\Http\HttpStatus;
 use Amp\Http\Server\Response as ServerResponse;
 use UnexpectedValueException;
 
+use function Amp\async;
 use function Amp\delay;
+use function Amp\Future\awaitAll;
 
 class TgClient
 {
@@ -108,12 +110,16 @@ class TgClient
         $messages = [];
         if (!$this->isPremium) {
             $messages = self::getContents($this->get('getSponsoredMessages', $peer));
+            $futures = [];
             foreach ($messages as $message) {
                 if (!empty($message['from_id'])) {
-                    $id = $this->getId($message['from_id']);
-                    $message['peer'] = $this->getInfo($id);
+                    $futures[] = async(function() use(&$message) {
+                        $id = $this->getId($message['from_id']);
+                        $message['peer'] = $this->getInfo($id);
+                    });
                 }
             }
+            awaitAll($futures);
         }
         return $messages;
     }
