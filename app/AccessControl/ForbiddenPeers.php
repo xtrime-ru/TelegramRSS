@@ -23,7 +23,7 @@ final class ForbiddenPeers
 
     public static function add(string $peer, string $error): void {
         switch ($error) {
-            case 'This peer is not present in the internal peer database':
+//            case 'This peer is not present in the internal peer database':
             case 'CHANNEL_PRIVATE':
             case 'USERNAME_INVALID':
             case 'BOTS NOT ALLOWED':
