@@ -4,6 +4,7 @@ namespace TelegramRSS\RSS;
 
 
 use TelegramRSS\Config;
+use TelegramRSS\Logger;
 use TelegramRSS\TgClient;
 
 use function Amp\async;
@@ -148,16 +149,26 @@ class Messages
     private function getMessageUrl(array $message): string
     {
         if ($message['_'] === 'sponsoredMessage') {
-            $postId = !empty($message['channel_post']) ? '/' . $message['channel_post'] : '';
-            $startParam = !empty($message['start_param']) ? '/?start=' . $message['start_param'] : '';
-            $peer = $message['peer']['bot_api_id'];
-            foreach ($message['peer'] as $property) {
-                if (!empty($property['username'])) {
-                    $peer = $property['username'];
-                    break;
-                }
+            if (!empty($message['webpage']['url'])) {
+                return $message['webpage']['url'];
             }
-            return self::TELEGRAM_URL . $peer . $postId . $startParam;
+            if (!empty($message['peer'])) {
+                $postId = !empty($message['channel_post']) ? '/' . $message['channel_post'] : '';
+                $startParam = !empty($message['start_param']) ? '/?start=' . $message['start_param'] : '';
+                $peer = $message['peer']['bot_api_id'];
+                foreach ($message['peer'] as $property) {
+                    if (!empty($property['username'])) {
+                        $peer = $property['username'];
+                        break;
+                    }
+                }
+                return self::TELEGRAM_URL . $peer . $postId . $startParam;
+            }
+
+            Logger::getInstance()->notice('Can get url for message', [
+                'message' => $message,
+            ]);
+            return md5(json_encode($message));
         } else {
             return $this->channelUrl . $message['id'];
         }
