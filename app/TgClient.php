@@ -109,8 +109,10 @@ class TgClient
         if (!$this->isPremium) {
             $messages = self::getContents($this->get('getSponsoredMessages', $peer));
             foreach ($messages as $message) {
-                $id = $this->getId($message['from_id']);
-                $message['peer'] = $this->getInfo($id);
+                if (!empty($message['from_id'])) {
+                    $id = $this->getId($message['from_id']);
+                    $message['peer'] = $this->getInfo($id);
+                }
             }
         }
         return $messages;
