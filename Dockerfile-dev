@@ -1,7 +1,8 @@
 FROM xtrime/telegram-api-server:latest
 
 RUN pecl install xdebug \
-	&& echo "zend_extension=xdebug.so" >> "$PHP_INI_DIR/conf.d/xdebug.ini"
+    && echo "" >> "$PHP_INI_DIR/conf.d/xdebug.ini" \
+    && echo "zend_extension=xdebug.so" >> "$PHP_INI_DIR/conf.d/xdebug.ini"
 
 EXPOSE 9504
 

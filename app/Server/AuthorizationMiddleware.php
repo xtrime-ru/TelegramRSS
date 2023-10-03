@@ -17,12 +17,14 @@ class AuthorizationMiddleware implements Middleware
     private array $ipWhitelist;
     private int $selfIp;
     private AccessControl $accessControl;
+    private string $forbibbenRefererRegex;
 
     public function __construct(AccessControl $accessControl)
     {
         $this->ipWhitelist = (array)Config::getInstance()->get('api.ip_whitelist', []);
         $this->selfIp = ip2long(getHostByName(php_uname('n')));
         $this->accessControl = $accessControl;
+        $this->forbibbenRefererRegex = (string)Config::getInstance()->get('access.forbidden_referer_regex');
     }
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
@@ -36,6 +38,13 @@ class AuthorizationMiddleware implements Middleware
         $user->addRequest($request->getUri());
 
         try {
+
+            $referer = $request->getHeader('referer');
+            $isStreaming = $request->hasHeader('range');
+            if ($referer && $this->forbibbenRefererRegex && !$isStreaming && preg_match("/{$this->forbibbenRefererRegex}/i", $referer)) {
+                throw new ClientException($request->getClient(), 'Referer forbidden: ' . $referer, HttpStatus::FORBIDDEN);
+            }
+
             if (!$this->isIpAllowed($host)) {
                 throw new ClientException($request->getClient(), 'Your host is not allowed: ' . $host , HttpStatus::FORBIDDEN);
             }

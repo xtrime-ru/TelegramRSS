@@ -35,6 +35,7 @@ class AccessLoggerMiddleware implements Middleware
             'method' => $method,
             'uri' => $uri,
             'user_agent' => $request->getHeader('user-agent'),
+            'referer' => $request->getHeader('referer'),
             'remote' => $remote,
             'rpm' => $user->rpm,
             'rpm_limit' => $user->rpmLimit,

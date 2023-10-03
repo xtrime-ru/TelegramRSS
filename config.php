@@ -44,7 +44,8 @@ return [
         'media_errors_limit' => (int) getenv('MEDIA_ERRORS_LIMIT'),
         'clients_settings' => $clientsSettings,
         'only_public_channels' => (bool) getenv('ONLY_PUBLIC_CHANNELS'),
-        'forbidden_peer_regex' => (string) getenv('FORBIDDEN_PEER_REGEX')
+        'forbidden_peer_regex' => (string) getenv('FORBIDDEN_PEER_REGEX'),
+        'forbidden_referer_regex' => (string)getenv('FORBIDDEN_REFERERS_REGEX'),
     ],
     'timezone' => (string) getenv('TIMEZONE'),
     'log' => [
