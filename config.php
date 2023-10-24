@@ -45,6 +45,7 @@ return [
         'clients_settings' => $clientsSettings,
         'only_public_channels' => (bool) getenv('ONLY_PUBLIC_CHANNELS'),
         'forbidden_peer_regex' => (string) getenv('FORBIDDEN_PEER_REGEX'),
+        'cache_peer_errors_regex' => (string) getenv('CACHE_PEER_ERRORS_REGEX'),
         'forbidden_referer_regex' => (string)getenv('FORBIDDEN_REFERERS_REGEX'),
     ],
     'timezone' => (string) getenv('TIMEZONE'),

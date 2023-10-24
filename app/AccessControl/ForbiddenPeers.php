@@ -22,18 +22,16 @@ final class ForbiddenPeers
     private static ?File $filePointer = null;
 
     public static function add(string $peer, string $error): void {
-        switch ($error) {
-//            case 'This peer is not present in the internal peer database':
-            case 'CHANNEL_PRIVATE':
-            case 'USERNAME_INVALID':
-            case 'BOTS NOT ALLOWED':
-            case 'This is not a public channel':
-                $peer = mb_strtolower($peer);
-                if ((self::$peers[$peer] ?? null) !== $error) {
-                    self::$peers[$peer] = $error;
-                    self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
-                }
-                break;
+        static $errorRegex = null;
+        if ($errorRegex === null) {
+            $errorRegex = Config::getInstance()->get('access.cache_peer_errors_regex');
+        }
+        if ($errorRegex && preg_match("/{$errorRegex}/", $error)) {
+            $peer = mb_strtolower($peer);
+            if ((self::$peers[$peer] ?? null) !== $error) {
+                self::$peers[$peer] = $error;
+                self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
+            }
         }
     }
 
