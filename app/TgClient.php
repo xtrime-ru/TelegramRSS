@@ -179,7 +179,7 @@ class TgClient
         if (!in_array($response->getStatus(), [200, 206, 302], true)) {
             $errorMessage = '';
             $errorCode = 400;
-            if (str_contains($response->getHeader('Content-Type'), 'application/json')) {
+            if (str_contains((string)$response->getHeader('Content-Type'), 'application/json')) {
                 $data = json_decode($response->getBody()->buffer(), true);
                 $errorMessage = $data['errors'][0]['message'] ?? $errorMessage;
                 $errorCode = $data['errors'][0]['code'] ?? $errorCode;
@@ -203,7 +203,7 @@ class TgClient
     private static function getContents(Response|ServerResponse $response): array|string
     {
         $data = [];
-        if (str_contains($response->getHeader('Content-Type'), 'application/json')) {
+        if (str_contains((string)$response->getHeader('Content-Type'), 'application/json')) {
             $data = json_decode($response->getBody()->buffer(), true, 50, JSON_THROW_ON_ERROR);
         }
         return $data['response'] ?? [];
