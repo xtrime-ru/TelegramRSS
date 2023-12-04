@@ -115,9 +115,9 @@ class Messages
 
         if (mb_strlen($descriptionText) > 50) {
             //Get first sentence from decription
-            preg_match('/(?<sentence>.*?\b\W*[.?!;\n])/ui', $descriptionText, $matches);
+            preg_match('/(?<sentence>.*?\b\W*[.?!;\n])(\W|$)/ui', $descriptionText, $matches);
 
-            $parsedMessage['title'] = $matches['sentence'] ?? '';
+            $parsedMessage['title'] = $matches['sentence'] ?? mb_strimwidth($descriptionText, 0, 100, ' [...]');
             $parsedMessage['title'] = trim($parsedMessage['title']);
         }
 
@@ -140,7 +140,7 @@ class Messages
 
         //Get first 100 symbols from description
         if (mb_strlen($parsedMessage['title']) > 100) {
-            $parsedMessage['title'] = mb_strimwidth($descriptionText, 0, 100, ' [...]');
+            $parsedMessage['title'] = mb_strimwidth($parsedMessage['title'], 0, 100, ' [...]');
         }
 
         return $parsedMessage;
