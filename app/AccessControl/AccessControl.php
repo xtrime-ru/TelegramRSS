@@ -5,9 +5,11 @@ namespace TelegramRSS\AccessControl;
 use Revolt\EventLoop;
 use TelegramRSS\Config;
 
+use function Amp\async;
 use function Amp\ByteStream\splitLines;
 use function Amp\File\isFile;
 use function Amp\File\openFile;
+use function Amp\Future\awaitAll;
 
 class AccessControl
 {
@@ -21,7 +23,7 @@ class AccessControl
         ROOT_DIR . '/cache/media-users.cache' => 'mediaUsers',
     ];
 
-    /** @var float Interval to remove old clients: 60 seconds */
+    /** @var float Interval to remove old clients: 300 seconds */
     private const CLEANUP_INTERVAL_MS = 60.0;
     private int $rpmLimit;
     private int $errorsLimit;
@@ -68,9 +70,12 @@ class AccessControl
     private function saveUsers(): void {
         foreach (self::FILES as $path => $object) {
             $descriptor = openFile($path, 'wb');
+            $memory = '';
             foreach ($this->{$object} as $key => $value) {
-                $descriptor->write(serialize([$key=>$value]) . PHP_EOL);
+                $memory .= serialize([$key=>$value]) . PHP_EOL;
             }
+            $descriptor->write($memory);
+            $descriptor->close();
         }
     }
 
