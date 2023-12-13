@@ -19,13 +19,17 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 1. Install docker  
     ```shell
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh ./get-docker.sh --dry-run
+    sudo sh ./get-docker.sh
    ```
 1. Install and start [Telegram Api Server](https://github.com/xtrime-ru/TelegramApiServer)
 1. Install and start
     ```shell 
     git clone https://github.com/xtrime-ru/TelegramRSS.git TelegramRSS
     cd TelegramRSS
+    ```
+1. `cp .env.docker.example .env.docker` and check settings in .env.docker: domain, ratelimit, allowed refferes, etc...
+1. Start container:
+    ```
     docker compose pull
     docker compose up -d
     ```
