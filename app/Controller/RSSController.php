@@ -31,7 +31,7 @@ class RSSController extends BaseFeedController implements RequestHandler
     {
         $channel = $request->getAttribute('channel');
         $messages = new Messages(
-            $this->getMessages($channel, $this->getPage($request), $this->getLimit($request)),
+            $this->getMessages($channel, $this->getPage($request), $this->getLimit($request), $this->getId($request)),
             $this->client,
             $channel
         );

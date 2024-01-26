@@ -82,6 +82,7 @@ docker compose up -d
   Maximum: 100 posts
   
 * Pagination: https://tg.i-c-a.su/json/breakingmash?page=2
+* Get one message: https://tg.i-c-a.su/json/breakingmash?id=10738&limit=1
 
 ### RSS
 * URL: https://tg.i-c-a.su/rss/breakingmash
@@ -90,6 +91,7 @@ docker compose up -d
   Maximum: 100 posts
   
 * Pagination: https://tg.i-c-a.su/rss/breakingmash/2
+* Get one message: https://tg.i-c-a.su/rss/breakingmash?id=10738&limit=1
 
 ### Media
 * https://tg.i-c-a.su/media/breakingmash/10738/preview

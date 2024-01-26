@@ -33,9 +33,14 @@ abstract class BaseFeedController implements RequestHandler
         return max(1, min($limit, self::LIMIT_MAX));
     }
 
+    protected function getId(Request $request): int
+    {
+        return (int)($request->getQueryParameter('id') ?? 0);
+    }
+
     abstract protected function getHeaders(): array;
 
-    protected function getMessages(string $channel, int $page, int $limit): array
+    protected function getMessages(string $channel, int $page, int $limit, int $message_id = 0): array
     {
         $isChannel = in_array($this->client->getInfo($channel)['type'], ['channel', 'supergroup']);
 
@@ -44,6 +49,7 @@ abstract class BaseFeedController implements RequestHandler
                 'peer' => $channel,
                 'limit' => $limit,
                 'add_offset' => ($page - 1) * $limit,
+                'offset_id' => $message_id ? ($message_id + 1) : 0,
             ]
         );
         if ($isChannel) {

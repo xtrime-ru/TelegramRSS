@@ -26,7 +26,8 @@ class JsonController extends BaseFeedController implements RequestHandler
                 $this->getMessages(
                     $request->getAttribute('channel'),
                     $this->getPage($request),
-                    $this->getLimit($request)
+                    $this->getLimit($request),
+                    $this->getId($request)
                 ),
                 JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
             )
