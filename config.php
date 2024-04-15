@@ -36,6 +36,8 @@ return [
     'client' => [
         'address' => (string) (getenv('TELEGRAM_CLIENT_ADDRESS') ?? '127.0.0.1'),
         'port' => (string) (getenv('TELEGRAM_CLIENT_PORT') ?? '9503'),
+        'username' => (string) (getenv('TELEGRAM_CLIENT_USERNAME')),
+        'password' => (string) (getenv('TELEGRAM_CLIENT_PASSWORD')),
     ],
     'access' => [
         'rpm' => (int) getenv('RPM'),

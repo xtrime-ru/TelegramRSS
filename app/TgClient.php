@@ -3,13 +3,17 @@
 namespace TelegramRSS;
 
 
+use Amp\Http\Client\Connection\DefaultConnectionFactory;
+use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
+use Amp\Http\Client\Interceptor\AddRequestHeader;
 use Amp\Http\Client\Request;
 use Amp\Http\Client\Response;
 use Amp\Http\HttpResponse;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\Response as ServerResponse;
+use Amp\Socket\DnsSocketConnector;
 use UnexpectedValueException;
 
 use function Amp\async;
@@ -31,15 +35,24 @@ class TgClient
      * @param string $address
      * @param int $port
      */
-    public function __construct(string $address = '', int $port = 0)
+    public function __construct(string $address = '', int $port = 0, string $username = '', string $password = '')
     {
         $address = $address ?: Config::getInstance()->get('client.address');
         $port = $port ?: Config::getInstance()->get('client.port');
+        $username = $username ?: Config::getInstance()->get('client.username');
+        $password = $password ?: Config::getInstance()->get('client.password');
         $this->apiUrl = "http://$address:$port";
-        $this->client = (new HttpClientBuilder())
+        $builder = (new HttpClientBuilder())
+            ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(new DnsSocketConnector())))
             ->retry(0)
-            ->build()
         ;
+
+        if ($username || $password) {
+            $base64 = base64_encode("{$username}:{$password}");
+            $builder = $builder->intercept(new AddRequestHeader('Authorization', "Basic $base64"));
+        }
+
+        $this->client = $builder->build();
     }
 
     public function getHistoryHtml(array $data): array
