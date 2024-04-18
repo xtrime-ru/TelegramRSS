@@ -31,7 +31,7 @@ return [
     'server' => [
         'address' => (string) (getenv('SERVER_ADDRESS') ?? '127.0.0.1'),
         'port' => (string) (getenv('SERVER_PORT') ?? '9504'),
-        'real_ip_header' => (string)(getenv('REAL_IP_HEADER') ?? '9504'),
+        'real_ip_header' => (string)(getenv('REAL_IP_HEADER') ?? ''),
     ],
     'client' => [
         'address' => (string) (getenv('TELEGRAM_CLIENT_ADDRESS') ?? '127.0.0.1'),
