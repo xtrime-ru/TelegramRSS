@@ -73,7 +73,6 @@ class TgClient
             [
                 'peer' => '',
                 'id' => [0],
-                'size_limit' => Config::getInstance()->get('media.max_size'),
             ],
             $data
         );
