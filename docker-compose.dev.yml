@@ -1,4 +1,3 @@
-version: '3.5'
 services:
   telegram-rss:
     image: xtrime/telegram-api-server:dev
