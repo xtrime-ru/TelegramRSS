@@ -42,12 +42,6 @@ if ($timezone = getenv('TIMEZONE')) {
     date_default_timezone_set($timezone);
 }
 
-/**
- * Disable amphp/http-server error codes check
- * @see \Amp\Http\Server\Driver\Http1Driver::sendErrorResponse
- */
-assert_options(ASSERT_ACTIVE, 0);
-
 if (!function_exists('debug')) {
     function debug(string $message, array $context) {
         Logger::getInstance()->debug($message, $context);

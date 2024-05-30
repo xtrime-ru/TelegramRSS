@@ -178,7 +178,7 @@ class TgClient
         );
         $request->setHeaders(array_merge(['Content-Type' => 'application/json'], $headers));
         $request->setTransferTimeout(600.0);
-        $request->setInactivityTimeout(60.0);
+        $request->setInactivityTimeout(5.0);
         $request->setBodySizeLimit(bodySizeLimit: 5 * (1024 ** 3)); // 5G
         $request->setTcpConnectTimeout(0.1);
         $request->setTlsHandshakeTimeout(0.1);
