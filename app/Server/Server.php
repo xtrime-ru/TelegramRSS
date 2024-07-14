@@ -34,7 +34,7 @@ final class Server
             clientFactory: new SocketClientFactory(Logger::getInstance()),
             httpDriverFactory: new DefaultHttpDriverFactory(
                 logger: Logger::getInstance(),
-                streamTimeout: 600,
+                streamTimeout: 30,
                 connectionTimeout: 5,
                 bodySizeLimit: 5 * (1024 ** 3) // 5G
             )
