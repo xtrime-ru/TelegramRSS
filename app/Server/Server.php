@@ -63,7 +63,7 @@ final class Server
     {
         if (defined('SIGINT')) {
             // Await SIGINT or SIGTERM to be received.
-            $signal = trapSignal([\SIGINT, \SIGTERM]);
+            $signal = trapSignal([\SIGINT, \SIGTERM, \SIGQUIT]);
             info(\sprintf("Received signal %d, stopping HTTP server", $signal));
             $server->stop();
         }
