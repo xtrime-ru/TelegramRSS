@@ -20,7 +20,7 @@
         "amphp/file": "^3",
         "amphp/http": "^2",
         "amphp/dns": "2.x-dev",
-        "vlucas/phpdotenv": "^4",
+        "vlucas/phpdotenv": "^5",
         "ext-json": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",

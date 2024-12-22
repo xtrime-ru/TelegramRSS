@@ -42,9 +42,11 @@ class Logger extends AbstractLogger
 
     private static string $dateTimeFormat = 'Y-m-d H:i:s';
     public int $minLevelIndex;
-    private array $formatter;
 
-    protected function __construct(string $minLevel = LogLevel::WARNING, callable $formatter = null)
+    /** @var callable(string $level, string $message, array $context): string  */
+    private $formatter;
+
+    protected function __construct(string $minLevel = LogLevel::WARNING, ?callable $formatter = null)
     {
         if (null === $minLevel) {
             if (isset($_ENV['SHELL_VERBOSITY']) || isset($_SERVER['SHELL_VERBOSITY'])) {
@@ -71,7 +73,7 @@ class Logger extends AbstractLogger
         }
 
         $this->minLevelIndex = self::$levels[$minLevel];
-        $this->formatter = $formatter ?: [$this, 'format'];
+        $this->formatter = $formatter ?: $this->format(...);
     }
 
     public static function getInstance(): Logger

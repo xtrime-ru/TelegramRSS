@@ -31,7 +31,7 @@ if (!is_file($envPath) || filesize($envPath) === 0) {
 }
 //Check if root env file hash been loaded (in case plugin installed in existing project)
 if (!getenv('SERVER_ADDRESS')) {
-    Dotenv\Dotenv::createImmutable($root, $envPath)->load();
+    Dotenv\Dotenv::createUnsafeImmutable($root, $envPath)->load();
 }
 
 if ($memoryLimit = getenv('MEMORY_LIMIT')) {
