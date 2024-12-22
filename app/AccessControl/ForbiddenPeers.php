@@ -54,9 +54,12 @@ final class ForbiddenPeers
                 $file = self::getFilePointer();
                 while(!$file->eof()){
                     foreach (splitLines($file) as $line) {
-                        [$oldPeer, $error] = str_getcsv(trim($line));
-                        if ($oldPeer && $error) {
-                            self::$peers[$oldPeer] = $error;
+                        $csv = str_getcsv(trim($line));
+                        if (count($csv) === 2) {
+                            [$oldPeer, $error] = $csv;
+                            if ($oldPeer && $error) {
+                                self::$peers[$oldPeer] = $error;
+                            }
                         }
                     }
                 }
