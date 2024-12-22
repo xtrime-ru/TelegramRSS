@@ -21,7 +21,6 @@ class Feed {
         $url = Config::getInstance()->get('url');
         $selfLink = "$url/rss/" . urlencode($peer);
 
-        var_dump($info);
         $this->title = $info['Chat']['title'] ?? 'No title';
         $this->description = $info['full']['about'] ?? 'No description';
         $this->link = Config::getInstance()->get('url');
