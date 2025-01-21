@@ -54,7 +54,7 @@ final class ForbiddenPeers
                 $file = self::getFilePointer();
                 while(!$file->eof()){
                     foreach (splitLines($file) as $line) {
-                        $csv = str_getcsv(trim($line));
+                        $csv = str_getcsv(trim($line), escape: "");
                         if (count($csv) === 2) {
                             [$oldPeer, $error] = $csv;
                             if ($oldPeer && $error) {
@@ -84,7 +84,7 @@ final class ForbiddenPeers
 
     static function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
         $fp = fopen('php://memory', 'r+b');
-        fputcsv($fp, $input, $delimiter, $enclosure);
+        fputcsv($fp, $input, $delimiter, $enclosure, "");
         rewind($fp);
         $data = rtrim(stream_get_contents($fp), "\n");
         fclose($fp);
