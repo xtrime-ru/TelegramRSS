@@ -9,3 +9,10 @@ services:
       - "9003"
     environment:
       PHP_IDE_CONFIG: "serverName=Docker"
+    extends:
+      file: docker-compose.yml
+      service: telegram-rss
+networks:
+  default:
+    external: true
+    name: telegram-api-server
