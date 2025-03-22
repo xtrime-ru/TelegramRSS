@@ -72,7 +72,13 @@ class Messages
                             ],
                         ],
                         'timestamp' => $message['date'] ?? '',
+                        'views' => ((int)$message['views']) ?? null,
+                        'reactions' => null,
                     ];
+
+                    if (!empty($message['reactions']['results'])) {
+                        $parsedMessage['reactions'] = array_sum(array_column($message['reactions']['results'], 'count'));
+                    }
 
                     if ($groupedMessages = array_reverse($groupedMessages)) {
                         foreach ($groupedMessages as $media) {

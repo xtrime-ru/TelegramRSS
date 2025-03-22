@@ -41,7 +41,7 @@ class Feed {
         $lastBuildDate = date(DATE_RSS, $latestDate);
         //Create the RSS feed
         $xmlFeed = new \SimpleXMLElement(
-            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"></rss>'
+            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"></rss>'
         );
 
         $xmlFeed->addChild('channel');
@@ -117,6 +117,15 @@ class Feed {
                     $enclosure['type'] = $media['mime'];
                     $enclosure['length'] = $media['size'];
                     unset($enclosure);
+                }
+            }
+            if (!empty($item['views']) || !empty($item['reactions'])) {
+                $stats = $newItem->addChild('media:media:community')->addChild('media:media:statistics');
+                if (!empty($item['views'])) {
+                    $stats->addAttribute('views', $item['views']);
+                }
+                if (!empty($item['reactions'])) {
+                    $stats->addAttribute('favorites', $item['reactions']);
                 }
             }
         }
