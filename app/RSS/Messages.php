@@ -72,7 +72,7 @@ class Messages
                             ],
                         ],
                         'timestamp' => $message['date'] ?? '',
-                        'views' => ((int)$message['views']) ?? null,
+                        'views' => $message['views'] ?? null,
                         'reactions' => null,
                     ];
 
