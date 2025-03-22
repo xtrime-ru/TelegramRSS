@@ -19,7 +19,6 @@
         "amphp/http-server-static-content": "^2",
         "amphp/file": "^3",
         "amphp/http": "^2",
-        "amphp/dns": "2.x-dev",
         "vlucas/phpdotenv": "^5",
         "ext-json": "*",
         "ext-dom": "*",
