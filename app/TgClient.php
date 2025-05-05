@@ -177,8 +177,8 @@ class TgClient
             json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE)
         );
         $request->setHeaders(array_merge(['Content-Type' => 'application/json'], $headers));
-        $request->setTransferTimeout(30.0);
-        $request->setInactivityTimeout(5.0);
+        $request->setTransferTimeout(1800.0);
+        $request->setInactivityTimeout(15.0);
         $request->setBodySizeLimit(bodySizeLimit: 5 * (1024 ** 3)); // 5G
         $request->setTcpConnectTimeout(0.1);
         $request->setTlsHandshakeTimeout(0.1);
