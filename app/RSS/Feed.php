@@ -23,6 +23,7 @@ class Feed {
 
         $this->title = $info['Chat']['title'] ?? 'No title';
         $this->description = $info['full']['about'] ?? 'No description';
+        $this->icon = sprintf("%s/icon/%s/icon.jpg", $url, urlencode($peer));
         $this->link = Config::getInstance()->get('url');
 
         $this->createRss($messages, $selfLink);
@@ -51,6 +52,11 @@ class Feed {
         $xmlFeed->channel->addChild('description', htmlspecialchars($this->description));
         $xmlFeed->channel->addChild('pubDate', $lastBuildDate);
         $xmlFeed->channel->addChild('lastBuildDate', $lastBuildDate);
+
+        $image = $xmlFeed->channel->addChild('image');
+        $image->addChild('url', $this->icon);
+        $image->addChild('title', 'favicon');
+        $image->addChild('ling', $this->link);
 
         $atomLink = $xmlFeed->channel->addChild('atom:atom:link');
         $atomLink->addAttribute('rel', 'self');

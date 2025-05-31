@@ -93,6 +93,11 @@ class TgClient
         return $this->get('getMediaPreview', ['data' => $data], $headers, 'media');
     }
 
+    public function downloadToResponse(array $messageMedia, array $headers): HttpResponse
+    {
+        return $this->get('downloadToResponse', ['messageMedia' => $messageMedia], headers: $headers, responseType: 'media');
+    }
+
     public function getMediaInfo(array $message): array
     {
         return self::getContents($this->get('getDownloadInfo', ['message' => $message]));
@@ -106,6 +111,11 @@ class TgClient
     public function getFullInfo(string $peer): array
     {
         return self::getContents($this->get('getFullInfo', $peer));
+    }
+
+    public function getPropicInfo(string $peer): array
+    {
+        return self::getContents($this->get('getPropicInfo', $peer));
     }
 
     public function getId($chat): string

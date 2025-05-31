@@ -6,6 +6,7 @@ use Amp\Http\Server\ErrorHandler;
 use Amp\Http\Server\SocketHttpServer;
 use Amp\Http\Server\StaticContent\DocumentRoot;
 use TelegramRSS\AccessControl\AccessControl;
+use TelegramRSS\Controller\IconController;
 use TelegramRSS\TgClient;
 use TelegramRSS\Controller\JsonController;
 use TelegramRSS\Controller\MediaController;
@@ -13,7 +14,6 @@ use TelegramRSS\Controller\RequestValidatorMiddleware;
 use TelegramRSS\Controller\RSSController;
 use TelegramRSS\Logger;
 
-use function Amp\Http\Server\Middleware\stack;
 use function Amp\Http\Server\Middleware\stackMiddleware;
 
 class Router
@@ -44,6 +44,7 @@ class Router
             $this->router->addRoute($method, '/json/{channel}[/[{page}[/]]]', stackMiddleware(new JsonController($client), ...$middlewares));
             $this->router->addRoute($method, '/rss/{channel}[/[{page}[/]]]', stackMiddleware(new RSSController($client), ...$middlewares));
             $this->router->addRoute($method, '/media/{channel}/{message_id}[/[{preview}[/[{filename}]]]]', stackMiddleware(new MediaController($client), ...$middlewares));
+            $this->router->addRoute($method, '/icon/{channel}[/[{filename}]]', stackMiddleware(new IconController($client), ...$middlewares));
         }
     }
 
