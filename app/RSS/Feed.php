@@ -11,6 +11,7 @@ class Feed {
 
     private string $rss;
     private string $link;
+    private string $icon;
 
     /**
      * RSS constructor.
