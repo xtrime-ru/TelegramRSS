@@ -74,6 +74,7 @@ class Messages
                         'timestamp' => $message['date'] ?? '',
                         'views' => $message['views'] ?? null,
                         'reactions' => null,
+                        'fwd_from' => $message['fwd_from'] ?? null,
                     ];
 
                     if (!empty($message['reactions']['results'])) {

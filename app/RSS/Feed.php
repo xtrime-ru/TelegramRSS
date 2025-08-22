@@ -69,6 +69,17 @@ class Feed {
             //Standard stuff
             if (!empty($item['id'])) $newItem->addChild('guid', $item['id']);
             if (!empty($item['title'])) $newItem->addChild('title', htmlspecialchars($item['title'], ENT_XML1));
+            if (!empty($item['fwd_from'])) {
+                $sourceUrl = $item['fwd_from']['saved_from_url'] ?? null;
+                if (!$sourceUrl && !empty($item['fwd_from']['from_id']['channel_id']) && !empty($item['fwd_from']['channel_post'])) {
+                    $sourceUrl = sprintf('https://t.me/c/%s/%s', $item['fwd_from']['from_id']['channel_id'], $item['fwd_from']['channel_post']);
+                }
+                if ($sourceUrl) {
+                    $sourceTitle = $item['fwd_from']['from_name'] ?? '';
+                    $source = $newItem->addChild('source', htmlspecialchars($sourceTitle, ENT_XML1));
+                    $source->addAttribute('url', $sourceUrl);
+                }
+            }
             if (!empty($item['description']) || !empty($item['preview']) || !empty($item['webpage'])) {
                 $description = '';
                 foreach ($item['preview'] as $url) {
