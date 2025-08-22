@@ -117,6 +117,10 @@ class Feed {
                 $newItem->addChild('link', $item['url']);
                 $newItem->addChild('guid', $item['url']);
             }
+            if (!empty($item['source'])) {
+                $source = $newItem->addChild('source', htmlspecialchars($item['source']['title'], ENT_XML1));
+                $source->addAttribute('url', $item['source']['url']);
+            }
             foreach ($item['media'] as $media) {
                 if (!empty($media['url'])) {
                     $enclosure = $newItem->addChild('enclosure');

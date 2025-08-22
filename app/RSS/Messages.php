@@ -76,6 +76,30 @@ class Messages
                         'reactions' => null,
                     ];
 
+                    if (!empty($message['fwd_from']['from_id']) && !empty($message['fwd_from']['channel_post'])) {
+                        $info = [];
+                        try {
+                            $info = $this->client->getInfo($message['fwd_from']['from_id']);
+                            $info = $info[array_key_first($info)] ?? [];
+                        } catch (\Throwable) {
+                        }
+
+
+                        $id = (int)\str_replace(['-100', '-'], '', $message['fwd_from']['from_id']);
+
+                        if (!empty($info['username'])) {
+                            $url = "https://t.me/{$info['username']}/{$message['fwd_from']['channel_post']}";
+                        } else {
+                            $url = "https://t.me/$id/{$message['fwd_from']['channel_post']}";
+                        }
+
+                        $parsedMessage['source'] = [
+                            'url' => $url,
+                            'title' => $info['title'] ?? '',
+                        ];
+
+                    }
+
                     if (!empty($message['reactions']['results'])) {
                         $parsedMessage['reactions'] = array_sum(array_column($message['reactions']['results'], 'count'));
                     }
