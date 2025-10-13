@@ -12,6 +12,8 @@ class Feed {
     private string $rss;
     private string $link;
     private string $icon;
+    public int $latestTimestamp;
+    public string $hash;
 
     /**
      * RSS constructor.
@@ -25,7 +27,9 @@ class Feed {
         $this->title = $info['Chat']['title'] ?? 'No title';
         $this->description = $info['full']['about'] ?? 'No description';
         $this->icon = sprintf("%s/icon/%s/icon.jpg", $url, urlencode($peer));
-        $this->link = Config::getInstance()->get('url');
+        $this->link = "https://t.me/s/" . urlencode($peer);
+        $this->latestTimestamp = $this->getLatestDate($messages);
+        $this->hash = md5(json_encode(func_get_args()));
 
         $this->createRss($messages, $selfLink);
     }
@@ -36,11 +40,7 @@ class Feed {
      * @return $this
      */
     private function createRss(array $messages, string $selfLink): self {
-        $latestDate = 0;
-        foreach ($messages as $message) {
-            if ($message['timestamp'] > $latestDate) $latestDate = $message['timestamp'];
-        }
-        $lastBuildDate = date(DATE_RSS, $latestDate);
+        $lastBuildDate = date(DATE_RSS, $this->latestTimestamp);
         //Create the RSS feed
         $xmlFeed = new \SimpleXMLElement(
             '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"></rss>'
@@ -57,7 +57,7 @@ class Feed {
         $image = $xmlFeed->channel->addChild('image');
         $image->addChild('url', $this->icon);
         $image->addChild('title', 'favicon');
-        $image->addChild('ling', $this->link);
+        $image->addChild('link', $this->link);
 
         $atomLink = $xmlFeed->channel->addChild('atom:atom:link');
         $atomLink->addAttribute('rel', 'self');
@@ -155,5 +155,16 @@ class Feed {
      */
     public function get(): string {
         return $this->rss;
+    }
+
+    private function getLatestDate(array $messages): int
+    {
+        $latestDate = 0;
+        foreach ($messages as $message) {
+            if ($message['timestamp'] > $latestDate) {
+                $latestDate = $message['timestamp'];
+            }
+        }
+        return $latestDate;
     }
 }

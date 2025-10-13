@@ -11,11 +11,14 @@ use TelegramRSS\RSS\Feed;
 class RSSController extends BaseFeedController implements RequestHandler
 {
 
+    private Feed $feed;
+
     public function handleRequest(Request $request): Response
     {
         $response = new Response();
+        $this->feed = $this->getFeed($request);
         $response->setHeaders($this->getHeaders());
-        $response->setBody($this->getContent($request));
+        $response->setBody($this->feed->get());
 
         return $response;
     }
@@ -24,19 +27,19 @@ class RSSController extends BaseFeedController implements RequestHandler
     {
         return [
             'Content-Type' => 'text/xml;charset=UTF-8',
+            'ETag' => sprintf('"%s"', $this->feed->hash),
+            'Last-Modified' => date(DATE_RFC7231, $this->feed->latestTimestamp),
         ];
     }
 
-    protected function getContent(Request $request): string
-    {
+    private function getFeed(Request $request): Feed {
         $channel = $request->getAttribute('channel');
         $messages = new Messages(
             $this->getMessages($channel, $this->getPage($request), $this->getLimit($request), $this->getId($request)),
             $this->client,
             $channel
         );
-        $rss = new Feed($messages->get(), $channel, $this->client->getFullInfo($channel));
-        return $rss->get();
+        return new Feed($messages->get(), $channel, $this->client->getFullInfo($channel));
     }
 
 }

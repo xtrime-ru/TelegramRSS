@@ -71,7 +71,7 @@ class Messages
                                 'image' => $this->getMediaUrl($message, $info, true),
                             ],
                         ],
-                        'timestamp' => $message['date'] ?? '',
+                        'timestamp' => $message['edit_date'] ?? $message['date'] ?? 0,
                         'views' => $message['views'] ?? null,
                         'reactions' => null,
                     ];
