@@ -179,6 +179,9 @@ class Messages
     private function getMessageUrl(array $message): string
     {
         if ($message['_'] === 'sponsoredMessage') {
+            if (!empty($message['url'])) {
+                return $message['url'];
+            }
             if (!empty($message['webpage']['url'])) {
                 return $message['webpage']['url'];
             }
