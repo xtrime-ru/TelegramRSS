@@ -43,7 +43,7 @@ class Feed {
         $lastBuildDate = date(DATE_RSS, $this->latestTimestamp);
         //Create the RSS feed
         $xmlFeed = new \SimpleXMLElement(
-            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"></rss>'
+            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss"></rss>'
         );
 
         $xmlFeed->addChild('channel');
@@ -131,12 +131,22 @@ class Feed {
                 }
             }
             if (!empty($item['views']) || !empty($item['reactions'])) {
-                $stats = $newItem->addChild('media:media:community')->addChild('media:media:statistics');
+                $mediaCommunity = $newItem->addChild('media:media:community');
+                $stats = $mediaCommunity->addChild('media:media:statistics');
                 if (!empty($item['views'])) {
                     $stats->addAttribute('views', $item['views']);
                 }
+                if (!empty($item['forwards'])) {
+                    $stats->addAttribute('forwards', $item['forwards']);
+                }
                 if (!empty($item['reactions'])) {
-                    $stats->addAttribute('favorites', $item['reactions']);
+                    $stats->addAttribute('favorites', array_sum($item['reactions']));
+                    $reactions = $mediaCommunity->addChild('media:media:reactions');
+                    foreach ($item['reactions'] as $emoji => $count) {
+                        $reaction = $reactions->addChild('media:media:reaction');
+                        $reaction->addAttribute('emoji', $emoji);
+                        $reaction->addAttribute('count', $count);
+                    }
                 }
             }
         }

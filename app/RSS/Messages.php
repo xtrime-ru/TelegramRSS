@@ -73,6 +73,7 @@ class Messages
                         ],
                         'timestamp' => $message['edit_date'] ?? $message['date'] ?? 0,
                         'views' => $message['views'] ?? null,
+                        'forwards' => $message['forwards'] ?? null,
                         'reactions' => null,
                     ];
 
@@ -101,7 +102,11 @@ class Messages
                     }
 
                     if (!empty($message['reactions']['results'])) {
-                        $parsedMessage['reactions'] = array_sum(array_column($message['reactions']['results'], 'count'));
+                        foreach ($message['reactions']['results'] as $reaction) {
+                            if ($reaction['_'] === 'reactionCount' && isset($reaction['reaction']['emoticon']) && isset($reaction['count'])) {
+                                $parsedMessage['reactions'][$reaction['reaction']['emoticon']] = $reaction['count'];
+                            }
+                        }
                     }
 
                     if ($groupedMessages = array_reverse($groupedMessages)) {
