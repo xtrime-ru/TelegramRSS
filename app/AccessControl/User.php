@@ -62,14 +62,13 @@ class User
 
         $this->requests[] = time();
         $this->rpm = $this->getRPM();
+    }
 
+    public function isRateLimited(): bool {
         if ($this->rpmLimit === -1) {
-            return;
+            return false;
         }
-
-        if ($this->rpm > $this->rpmLimit) {
-            $this->addError("Too many requests", $url);
-        }
+        return $this->rpm > $this->rpmLimit;
     }
 
     public function getLastAccessTs(): int

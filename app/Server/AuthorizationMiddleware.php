@@ -49,6 +49,9 @@ class AuthorizationMiddleware implements Middleware
                 str_contains($request->getUri(), '/media/') ? 'media' : 'default'
             );
             $user->addRequest($request->getUri());
+            if ($user->isRateLimited()) {
+                throw new ClientException($request->getClient(), 'Too many requests', HttpStatus::TOO_MANY_REQUESTS);
+            }
 
             $referer = $request->getHeader('referer');
             $isStreaming = $request->hasHeader('range');
@@ -57,7 +60,7 @@ class AuthorizationMiddleware implements Middleware
             }
 
             if ($user->isBanned()) {
-                throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::FORBIDDEN);
+                throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::TOO_MANY_REQUESTS);
             }
         } catch (\Throwable $e) {
             $errors = array_merge($user ? $user->errors : [], [$e->getMessage()]);
