@@ -207,12 +207,15 @@ class TgClient
                 $errorCode = $data['errors'][0]['code'] ?? $errorCode;
             }
 
+
             if (!$errorMessage) {
                 return $this->get($method, $parameters, $headers, $responseType, ++$retry);
             }
             if ($errorMessage) {
                 if ($errorMessage === 'Message has no preview' || $errorMessage === 'Empty preview') {
                     return new ServerResponse(HttpStatus::TEMPORARY_REDIRECT, ['location' => '/no-image.jpg']);
+                } elseif (str_starts_with($errorMessage, 'FLOOD_WAIT')) {
+                    $errorCode = HttpStatus::TOO_MANY_REQUESTS;
                 }
                 throw new UnexpectedValueException($errorMessage, $errorCode);
             }
