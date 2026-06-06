@@ -1,10 +1,8 @@
 FROM xtrime/telegram-api-server:latest
 
-
-ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
-
-RUN chmod +x /usr/local/bin/install-php-extensions \
-    && install-php-extensions xdebug
+RUN apt update && apt install -y autoconf build-essential \
+    && pecl install xdebug \
+    && apt clean
 
 ADD dev/xdebug.ini $PHP_INI_DIR/conf.d/xdebug.ini
 
