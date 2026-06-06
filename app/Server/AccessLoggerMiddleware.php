@@ -26,10 +26,11 @@ class AccessLoggerMiddleware implements Middleware
         $uri = (string)$request->getUri();
         $protocolVersion = $request->getProtocolVersion();
 
-        $user = $this->accessControl->getOrCreateUser(
-            $remote,
-            str_contains($uri, '/media/') ? 'media' : 'default'
-        );
+        $authorizationHeader = $request->getHeader('authorization');
+        $clientType = str_contains($uri, '/media/') ? 'media' : 'default';
+        $username = $this->accessControl->checkAuth($authorizationHeader);
+        $user = $this->accessControl->getOrCreateUser($username ?: $remote, $clientType);
+        $request->setAttribute('user', $user);
 
         $context = [
             'method' => $method,
@@ -37,6 +38,7 @@ class AccessLoggerMiddleware implements Middleware
             'user_agent' => $request->getHeader('user-agent'),
             'referer' => $request->getHeader('referer'),
             'remote' => $remote,
+            'username' => $username,
             'rpm' => $user->rpm,
             'rpm_limit' => $user->rpmLimit,
             'errors' => count($user->errors),

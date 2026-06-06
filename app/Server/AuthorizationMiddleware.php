@@ -9,6 +9,7 @@ use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Response;
 use TelegramRSS\AccessControl\AccessControl;
+use TelegramRSS\AccessControl\User;
 use TelegramRSS\TgClient;
 use TelegramRSS\Config;
 
@@ -16,10 +17,9 @@ class AuthorizationMiddleware implements Middleware
 {
     private array $ipBlacklist = [];
     private int $selfIp;
-    private AccessControl $accessControl;
     private string $forbibbenRefererRegex;
 
-    public function __construct(AccessControl $accessControl)
+    public function __construct()
     {
         $fileName = (string)Config::getInstance()->get('access.ip_blacklist', "");
         $filePath = ROOT_DIR . "/{$fileName}";
@@ -30,7 +30,6 @@ class AuthorizationMiddleware implements Middleware
             $this->ipBlacklist = array_fill_keys($ips, null);
         }
         $this->selfIp = ip2long(getHostByName(php_uname('n')));
-        $this->accessControl = $accessControl;
         $this->forbibbenRefererRegex = (string)Config::getInstance()->get('access.forbidden_referer_regex');
     }
 
@@ -44,10 +43,11 @@ class AuthorizationMiddleware implements Middleware
                 throw new ClientException($request->getClient(), 'Your ip is not allowed: ' . $host , HttpStatus::FORBIDDEN);
             }
 
-            $user = $this->accessControl->getOrCreateUser(
-                $host,
-                str_contains($request->getUri(), '/media/') ? 'media' : 'default'
-            );
+            /**
+             * @var User $user
+             * @see AccessLoggerMiddleware::handleRequest
+             * */
+            $user = $request->getAttribute('user');
             $user->addRequest($request->getUri());
             if ($user->isRateLimited()) {
                 throw new ClientException($request->getClient(), 'Too many requests', HttpStatus::TOO_MANY_REQUESTS);

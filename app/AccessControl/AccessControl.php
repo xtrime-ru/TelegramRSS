@@ -5,11 +5,11 @@ namespace TelegramRSS\AccessControl;
 use Revolt\EventLoop;
 use TelegramRSS\Config;
 
-use function Amp\async;
+use TelegramRSS\Logger;
+
 use function Amp\ByteStream\splitLines;
 use function Amp\File\isFile;
 use function Amp\File\openFile;
-use function Amp\Future\awaitAll;
 
 class AccessControl
 {
@@ -31,7 +31,7 @@ class AccessControl
     private int $mediaRpmLimit;
     private int $mediaErrorsLimit;
 
-    /** @var int[]  */
+    /** @var array<string, array<string, mixed>> */
     private array $clientsSettings;
 
     public function __construct()
@@ -101,28 +101,87 @@ class AccessControl
         }
     }
 
-    public function getOrCreateUser(string $ip, string $type = 'default'): User
+    public function getOrCreateUser(string $clientKey, string $type = 'default'): User
     {
+        $settings = $this->clientsSettings[$clientKey] ?? [];
+
         if ($type === 'media') {
-            if (!isset($this->mediaUsers[$ip])) {
-                $this->mediaUsers[$ip] = new User();
+            if (!isset($this->mediaUsers[$clientKey])) {
+                $this->mediaUsers[$clientKey] = new User();
             }
 
-            $this->mediaUsers[$ip]->rpmLimit = $this->clientsSettings[$ip]['media_rpm'] ?? $this->clientsSettings[$ip]['rpm'] ?? $this->mediaRpmLimit;
-            $this->mediaUsers[$ip]->errorsLimit = $this->clientsSettings[$ip]['media_errors_limit'] ?? $this->clientsSettings[$ip]['errors_limit'] ?? $this->mediaErrorsLimit;
+            $this->mediaUsers[$clientKey]->rpmLimit = $settings['media_rpm'] ?? $settings['rpm'] ?? $this->mediaRpmLimit;
+            $this->mediaUsers[$clientKey]->errorsLimit = $settings['media_errors_limit'] ?? $settings['errors_limit'] ?? $this->mediaErrorsLimit;
 
-            return $this->mediaUsers[$ip];
+            return $this->mediaUsers[$clientKey];
         } else {
-            if (!isset($this->users[$ip])) {
-                $this->users[$ip] = new User();
+            if (!isset($this->users[$clientKey])) {
+                $this->users[$clientKey] = new User();
             }
 
-            $this->users[$ip]->rpmLimit = $this->clientsSettings[$ip]['rpm'] ?? $this->rpmLimit;
-            $this->users[$ip]->errorsLimit = $this->clientsSettings[$ip]['errors_limit'] ?? $this->errorsLimit;
+            $this->users[$clientKey]->rpmLimit = $settings['rpm'] ?? $this->rpmLimit;
+            $this->users[$clientKey]->errorsLimit = $settings['errors_limit'] ?? $this->errorsLimit;
 
-            return $this->users[$ip];
+            return $this->users[$clientKey];
+        }
+    }
+
+    public function checkAuth(?string $authorizationHeader = null): ?string
+    {
+        return $this->authenticateBasicAuth($authorizationHeader);
+    }
+
+    public function authenticateBasicAuth(?string $authorizationHeader): ?string
+    {
+        $credentials = $this->parseBasicAuthHeader($authorizationHeader);
+        if ($credentials === null) {
+            return null;
         }
 
+        [$username, $password] = $credentials;
+        $settings = $this->clientsSettings[$username] ?? [];
+        $expectedPassword = $settings['password'] ?? null;
+
+        if ($expectedPassword > '')  {
+            if ($password === $expectedPassword) {
+                return $username;
+            }
+            Logger::getInstance()->notice('Invalid Basic Auth password', ['header' => $authorizationHeader, 'username' => $username, 'password' => $password]);
+        } else {
+            Logger::getInstance()->notice('Basic Auth password not set', ['username' => $username]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    private function parseBasicAuthHeader(?string $authorizationHeader): ?array
+    {
+        if ($authorizationHeader === null || $authorizationHeader === '') {
+            return null;
+        }
+
+        \sscanf($authorizationHeader, "Basic %s", $encodedPassword);
+        if (!$encodedPassword) {
+            return null;
+        }
+
+
+        $decoded = base64_decode($encodedPassword, true);
+        if ($decoded === false || !str_contains($decoded, ':')) {
+            Logger::getInstance()->notice('Invalid Basic Auth header', ['header' => $authorizationHeader, 'decoded' => $decoded]);
+            return null;
+        }
+
+        [$username, $password] = explode(':', $decoded, 2);
+        if ($username === '') {
+            Logger::getInstance()->notice('Invalid Basic Auth username', ['header' => $authorizationHeader, 'decoded' => $decoded]);
+            return null;
+        }
+
+        return [$username, $password];
     }
 
 }
