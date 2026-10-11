@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use Symfony\Bridge\PhpUnit\ClockMock;
 use TelegramRSS\AccessControl\AccessControl;
-
+use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;
 use TelegramRSS\Config;
 
@@ -122,6 +122,17 @@ final class UserTest extends TestCase
         self::assertSame([], $access->getOrCreateUser('intermediate')->errors);
         ClockMock::sleep(31);
         self::assertSame([false, false, true], $this->consume($restored, 3));
+    }
+
+    public function testAddingForbiddenPeerPreservesExistingFileWithoutDuplicateEntries(): void
+    {
+        $path = ROOT_DIR . '/cache/forbidden-peers.csv';
+        file_put_contents($path, 'old,PRIVATE_OLD' . "\n");
+        ForbiddenPeers::add('@NEW', 'PRIVATE_NEW');
+        ForbiddenPeers::add('NEW', 'PRIVATE_NEW');
+        self::assertSame('PRIVATE_OLD', ForbiddenPeers::check('@OLD'));
+        self::assertSame('PRIVATE_NEW', ForbiddenPeers::check('new'));
+        self::assertSame(['old,PRIVATE_OLD', 'new,PRIVATE_NEW'], file($path, FILE_IGNORE_NEW_LINES));
     }
 
     /** @return list<bool> */

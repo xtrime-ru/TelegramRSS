@@ -9,6 +9,8 @@ use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use TelegramRSS\AccessControl\ForbiddenPeers;
+use TelegramRSS\Cache\TelegramCache;
+use TelegramRSS\Cache\CacheContext;
 use TelegramRSS\Config;
 use TelegramRSS\TgClient;
 
@@ -17,15 +19,19 @@ class RequestValidatorMiddleware implements Middleware
 
     public function __construct(
         private readonly TgClient $tgClient,
+        private readonly bool $deferRemoteValidation = false,
     ) {
     }
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
     {
-        $channel = self::getChannel($request);
+        $channel = TelegramCache::normalizeChannel(self::getChannel($request));
         $request->setAttribute('channel', $channel);
         try {
-            $this->validatePeer($request);
+            $this->validateLocalPeer($request);
+            if (!$this->deferRemoteValidation) {
+                $this->validateRemotePeer($request);
+            }
             return $requestHandler->handleRequest($request);
         } catch (\Throwable $exception) {
             ForbiddenPeers::add($channel, $exception->getMessage());
@@ -42,7 +48,14 @@ class RequestValidatorMiddleware implements Middleware
 
     public function validatePeer(Request $request): void
     {
+        $this->validateLocalPeer($request);
+        $this->validateRemotePeer($request);
+    }
+
+    public function validateLocalPeer(Request $request): void
+    {
         $client = $request->getClient();
+        /** @var string $channel */
         $channel = $request->getAttribute('channel');
 
         if (Config::getInstance()->get('access.only_public_channels')) {
@@ -59,8 +72,14 @@ class RequestValidatorMiddleware implements Middleware
         if ($error !== null) {
             throw new ClientException($client, $error, 403);
         }
+    }
 
-        $info = $this->tgClient->getInfo($channel);
+    public function validateRemotePeer(Request $request, ?CacheContext $context = null): void
+    {
+        $client = $request->getClient();
+        /** @var string $channel */
+        $channel = $request->getAttribute('channel');
+        $info = $this->tgClient->getInfo($channel, context: $context);
         $isChannel = in_array($info['type'], ['channel', 'supergroup']);
         if (
             Config::getInstance()->get('access.only_public_channels') &&

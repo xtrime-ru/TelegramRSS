@@ -2,8 +2,11 @@
 
 namespace TelegramRSS\AccessControl;
 
-use Amp\File\File;
+use Amp\ByteStream\StreamException;
+use Amp\File\FilesystemException;
 use TelegramRSS\Config;
+use TelegramRSS\Logger;
+use TelegramRSS\Cache\TelegramCache;
 
 use function Amp\ByteStream\splitLines;
 use function Amp\File\isFile;
@@ -14,12 +17,10 @@ final class ForbiddenPeers
 
     private static ?string $regex = null;
 
-    /** @var array<string, string> */
+    /** @var array<string, string>|null */
     private static ?array $peers = null;
 
     private const FILE = ROOT_DIR . '/cache/forbidden-peers.csv';
-    /** @var resource|null */
-    private static ?File $filePointer = null;
 
     public static function add(string $peer, string $error): void {
         static $errorRegex = null;
@@ -27,10 +28,22 @@ final class ForbiddenPeers
             $errorRegex = Config::getInstance()->get('access.cache_peer_errors_regex');
         }
         if ($errorRegex && preg_match("/{$errorRegex}/", $error)) {
-            $peer = mb_strtolower($peer);
+            $peer = TelegramCache::normalizeChannel($peer);
+            self::check($peer);
             if ((self::$peers[$peer] ?? null) !== $error) {
                 self::$peers[$peer] = $error;
-                self::getFilePointer()->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
+                try {
+                    $file = openFile(self::FILE, 'ab');
+                    try {
+                        $file->write(self::str_putcsv([$peer, $error]) . PHP_EOL);
+                    } finally {
+                        $file->close();
+                    }
+                } catch (FilesystemException | StreamException $exception) {
+                    Logger::getInstance()->error('Failed to append forbidden peer', [
+                        'peer' => $peer, 'exception' => $exception,
+                    ]);
+                }
             }
         }
     }
@@ -43,27 +56,31 @@ final class ForbiddenPeers
      * @return string|null
      */
     public static function check(string $peer): ?string {
-        $peer = mb_strtolower($peer);
+        $peer = TelegramCache::normalizeChannel($peer);
 
         if (self::$regex === null) {
             self::$regex = (string)Config::getInstance()->get('access.forbidden_peer_regex');
         }
 
         if (self::$peers === null) {
+            $peers = [];
             if (isFile(self::FILE)) {
-                $file = self::getFilePointer();
-                while(!$file->eof()){
+                $file = openFile(self::FILE, 'rb');
+                try {
                     foreach (splitLines($file) as $line) {
                         $csv = str_getcsv(trim($line), escape: "");
                         if (count($csv) === 2) {
                             [$oldPeer, $error] = $csv;
                             if ($oldPeer && $error) {
-                                self::$peers[$oldPeer] = $error;
+                                $peers[TelegramCache::normalizeChannel($oldPeer)] = $error;
                             }
                         }
                     }
+                } finally {
+                    $file->close();
                 }
             }
+            self::$peers = $peers;
         }
 
         $regex = self::$regex;
@@ -74,20 +91,20 @@ final class ForbiddenPeers
         return self::$peers[$peer] ?? null;
     }
 
-    private static function getFilePointer(): File {
-        if (self::$filePointer === null) {
-            self::$filePointer = openFile(self::FILE, 'cb+');
-        }
-
-        return self::$filePointer;
-    }
-
+    /**
+     * @param list<string> $input
+     * @param string $delimiter
+     * @param string $enclosure
+     * @return string
+     */
     static function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
         $fp = fopen('php://memory', 'r+b');
-        fputcsv($fp, $input, $delimiter, $enclosure, "");
-        rewind($fp);
-        $data = rtrim(stream_get_contents($fp), "\n");
-        fclose($fp);
-        return $data;
+        try {
+            fputcsv($fp, $input, $delimiter, $enclosure, "");
+            rewind($fp);
+            return rtrim(stream_get_contents($fp), "\n");
+        } finally {
+            fclose($fp);
+        }
     }
 }

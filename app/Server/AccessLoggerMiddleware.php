@@ -9,6 +9,8 @@ use Amp\Http\Server\Response;
 use Psr\Log\LoggerInterface as PsrLogger;
 use Psr\Log\LogLevel;
 use TelegramRSS\AccessControl\AccessControl;
+use TelegramRSS\Cache\CacheContext;
+use TelegramRSS\Cache\CacheStatus;
 
 class AccessLoggerMiddleware implements Middleware
 {
@@ -73,7 +75,8 @@ class AccessLoggerMiddleware implements Middleware
         $context['rate_limit_remaining'] = $rateLimit?->getRemainingTokens();
         $context['rate_limit_used'] = $rateLimit ? $rateLimit->getLimit() - $rateLimit->getRemainingTokens() : null;
         $context['rate_limit_retry_after'] = $user->rateRetryAfter;
-
+        $context += CacheContext::fromRequest($request)?->logFields()
+            ?? ['cache_status' => CacheStatus::BYPASS->value, 'message_source' => null, 'cache_ttl' => null];
 
         $context = [
             'request' => $context,

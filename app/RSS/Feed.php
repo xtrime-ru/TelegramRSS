@@ -5,6 +5,7 @@ namespace TelegramRSS\RSS;
 
 use TelegramRSS\Config;
 
+/** @phpstan-import-type FeedItem from Messages */
 class Feed {
     private string $title;
     private string $description;
@@ -17,8 +18,8 @@ class Feed {
 
     /**
      * RSS constructor.
-     * @param array $messages
-     * @param string $peer
+     * @param list<FeedItem> $messages
+     * @param array{Chat?: array{title?: string, ...}, full?: array{about?: string, ...}, ...} $info
      */
     public function __construct(array $messages, string $peer, array $info) {
         $url = Config::getInstance()->get('url');
@@ -35,9 +36,7 @@ class Feed {
     }
 
     /**
-     * @param array $messages
-     * @param string $selfLink
-     * @return $this
+     * @param list<FeedItem> $messages
      */
     private function createRss(array $messages, string $selfLink): self {
         $lastBuildDate = date(DATE_RSS, $this->latestTimestamp);
@@ -167,6 +166,9 @@ class Feed {
         return $this->rss;
     }
 
+    /**
+     * @param list<FeedItem> $messages
+     */
     private function getLatestDate(array $messages): int
     {
         $latestDate = 0;

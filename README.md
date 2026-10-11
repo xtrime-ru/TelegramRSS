@@ -9,6 +9,7 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 * Get any public telegram posts from groups as json or RSS
 * fail2ban, Symfony token-bucket request limits, IP blacklist
 * Full media support. Access any media from messages via direct links.
+* Shared feed/history cache and media-message reuse across clients
 
 ## Client request limits
 
@@ -52,51 +53,111 @@ share quotas. Access logs include `rpm_limit`, `rate_limit_policy`,
 and used quota come from Symfony's read-only `consume(0)` result. `rate_limit_used`
 is the sliding-window estimate of accepted requests, excludes rejected attempts,
 and is `null` when the quota is disabled or access is denied with `rpm=0`.
-The separate per-user RPM counter is removed.
+Access logs use the limiter’s current usage and remaining quota; no separate RPM counter is maintained.
 
-## Shared cache policy
+## Shared cache
 
-Loaders always return `CacheResult<T>`. `remember()` only checks TTL, coalesces
-loads through Future and stores non-BYPASS results. It propagates API errors;
-complete-feed middleware handles FLOOD_WAIT fallback when introduced.
+Caching is enabled by default, including for existing installations without a
+`CACHE_ENABLED` setting. Set `CACHE_ENABLED=0` in `.env` or `.env.docker` and restart
+the process to disable it. Telegram FLOOD_WAIT cooldowns remain active.
 
-`TelegramCache` reuses successful results for a fixed TTL (60 seconds by default).
-Cache hits retain the original load time. Concurrent loads share an Amp Future,
-released after either success or error. FLOOD_WAIT pauses all API methods for the
-normalized peer; other peers remain available. Expired pauses are pruned.
+Successful results are shared across IP addresses and reused for 60 seconds by
+default, regardless of request frequency. Cache hits do not renew timestamps.
+Even infrequently accessed channels can therefore return data up to 60 seconds old.
 
-Symfony's PSR-6 `ArrayAdapter` stores independent value copies and evicts the
-least recently used records beyond the 2,000-entry default. There is no byte limit.
-Keys are hashed to comply with PSR-6 restrictions. The cache resets on restart.
-The cache provides age-limited lookup of the last successful result; only feed
-middleware may use it for fallback. History and messages have no stale fallback.
-
-TgClient shares the latest 100-message history snapshot across limits and pages.
-Only fully covered ranges (or the confirmed end of history) are sliced. Older,
-anchored and partially covered ranges use the original uncached API query.
-Successful history seeds the message index; getMessages refreshes expired or
-missing entries. Missing messages are not negatively cached. Concurrent updates
-may retain an older snapshot until the next refresh. Media shares messages but
-uses independent original/preview/Range streams; file bytes and icons are not cached.
-
-Request context is passed explicitly to TgClient, including async sponsored
-lookups. CacheContext tracks response eligibility, source age and log fields;
-TelegramCache holds no current-request state. Calls without context retain their
-existing behaviour, including uncached icon/direct getInfo calls.
-
-Settings are configured through env and take effect after restart:
+All cache policy settings are configured through `.env` / `.env.docker`:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CACHE_ENABLED` | `1` | Enable cache storage and reuse |
+| `CACHE_ENABLED` | `1` | Enable cache reuse and storage of successful results |
 | `CACHE_MAX_ENTRIES` | `2000` | Maximum records; `0` disables storage |
-| `CACHE_TTL_SECONDS` | `60` | Freshness; `0` disables fresh reuse |
-| `CACHE_STALE_TTL_SECONDS` | `900` | Complete-feed fallback age; `0` disables fallback |
-| `CACHE_HISTORY_WINDOW_SIZE` | `100` | History window size, 1–100 |
+| `CACHE_TTL_SECONDS` | `60` | Freshness of cached results; `0` disables fresh reuse |
+| `CACHE_HISTORY_WINDOW_SIZE` | `100` | Number of latest messages fetched for the shared history window; range 1–100 |
+| `CACHE_STALE_TTL_SECONDS` | `900` | Maximum complete RSS/JSON response age on FLOOD_WAIT; `0` disables stale fallback |
 
-Tests use PHPUnit 13 and Mockery. Run `composer test` (or `vendor/bin/phpunit`).
-Each test runs in a separate process without inherited global state. Mocks,
-application settings and Symfony `ClockMock` are initialized inside the test class.
+Limits and TTLs must be non-negative. Restart the process after editing env
+settings; omitted variables retain the defaults.
+
+Feed responses and history are cached separately. RSS and JSON, different limits
+and pages share a snapshot of the latest 100 messages per channel by default.
+A requested range is sliced from this snapshot only if fully covered or its
+`count` confirms the end of history. The original count, chats, users and other
+response fields are preserved. Ranges extending beyond the configured window,
+requests with `id`, and ranges not covered by a partial snapshot use their original
+API parameters without caching history or the complete response. Cached and fresh
+pages are never stitched together. Such requests have no FLOOD_WAIT fallback;
+the peer cooldown returns HTTP 429 with `Retry-After`. Successful messages still
+update the shared media index. Channel names are case-insensitive and an
+initial `@` is ignored. Page, limit and format affect the complete-response key;
+client IP and unused query parameters such as `_cb` do not. Authorization,
+individual rate limits, IP/Referer rules and forbidden-peer checks still run on
+every request. Concurrent loads of the same key share one API call.
+
+History also supplies a shared message index keyed by channel and message ID.
+Only newly fetched history seeds the index; cache hits do not rewrite messages.
+Successful history and `getMessages` loads replace all fields of each indexed
+message. A `getMessages` lookup confirming absence removes the indexed message;
+absence is not negatively cached. An absent ID on a history page does not imply
+deletion. History, messages and complete feeds expire independently using their
+original load times and the configured TTL. Updating a message does not flush
+cached feeds. Overlapping loads may temporarily retain an older snapshot; the
+next API refresh replaces it. There are no revisions, tombstones or cross-cache
+invalidation, keeping updates cheap and avoiding extra API calls for fresh feeds.
+
+Media requests reuse indexed messages while the configured TTL permits,
+otherwise loading them through `getMessages`. Original files and previews share
+the message, but each download has its own stream and Range headers. File bytes
+and icons are not cached. Cache hits never renew a result's original timestamp.
+
+On FLOOD_WAIT, all API methods for the affected normalized peer are paused within
+the client session. Format, IP, page, message ID and method do not split the pause;
+other peers remain available. Repeated errors can extend, but never shorten, its
+end time. Expired pause records are pruned whenever pauses are checked or recorded.
+Cached RSS/JSON responses can still be returned after access checks. Expired complete RSS/JSON responses up to 15 minutes old can serve as fallback,
+retaining their original load time; `CACHE_STALE_TTL_SECONDS` controls this age.
+Further fallback requests never renew the allowance. History, individual messages
+and metadata have no stale fallback. During a pause, a feed without a suitable
+complete cached response returns HTTP 429 with `Retry-After` before any API work.
+
+Media checks the peer pause before validation, message lookup and download; direct
+client calls and async metadata requests also carry the owning peer. Every HTTP
+call checks again immediately before dispatch, in case a pause appeared while
+waiting for another request. During a pause, downloads and uncached history ranges
+return HTTP 429 with the remaining seconds in `Retry-After`. File bytes are never
+retained or used as fallback. Other errors are not cached as successes.
+
+Request cache context is passed explicitly from middleware through controllers to
+TgClient, including async sponsored-message lookups. It carries response-cache
+eligibility, original load time and access-log fields. The shared cache stores no
+current-request state; coalesced callers update their own contexts independently.
+
+Cache loaders always return `CacheResult<T>`. `remember()` checks freshness,
+coalesces concurrent loads and stores results unless their status is `BYPASS`.
+Only the feed middleware handles FLOOD_WAIT fallback, after checking the loader's
+final response-cache eligibility. Coalesced callers share that fallback decision;
+reusing a response never renews its source timestamp.
+
+Storage uses Symfony's PSR-6 `ArrayAdapter` for in-memory values, independent copies
+and LRU eviction. Keys are hashed to satisfy PSR-6 key restrictions. TTL checks,
+message indexing, coalesced loads and FLOOD_WAIT remain application policy.
+Storage retains successful results beyond their TTL for complete-feed fallback;
+freshness is checked against the original load time.
+
+The cache is local to one process and resets on restart. `CACHE_MAX_ENTRIES` limits
+all cached records to 2,000 by default. There is no byte
+limit; `CACHE_MAX_BYTES` is no longer used. Active downloads and in-flight loads
+are outside the stored-record limit.
+Access logs include `cache_status`, `message_source` and `cache_ttl`.
+
+Tests require PHP 8.4.1+ and PHPUnit 13. Install development dependencies with
+`composer install`, then run the suite with `composer test` (or `vendor/bin/phpunit`).
+Use `--filter` to select a
+test, for example `composer test -- --filter FloodWait`. HTTP clients use Mockery
+mocks with Telegram response fixtures, a controlled cache clock and Symfony
+`ClockMock` for limiter refill. Each test runs in its own process without inheriting
+global state; mocks and application settings are initialized inside the test class.
+Tests run without Telegram access or writes to the
+application's persistent cache files.
 
 ## Architecture Example
 

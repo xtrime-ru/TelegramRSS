@@ -37,14 +37,16 @@ class Router
         $accessControl = new AccessControl();
         $middlewares = [
             new AccessLoggerMiddleware(Logger::getInstance(), $accessControl),
-            new AuthorizationMiddleware($accessControl),
-            new RequestValidatorMiddleware($client),
+            new AuthorizationMiddleware(),
         ];
+        $validator = new RequestValidatorMiddleware($client, true);
+        /** @var \Closure(string): list<\Amp\Http\Server\Middleware> $cached */
+        $cached = fn (string $format): array => [...$middlewares, $validator, new CacheMiddleware($client, $validator, $format)];
         foreach (['GET', 'POST'] as $method) {
-            $this->router->addRoute($method, '/json/{channel}[/[{page}[/]]]', stackMiddleware(new JsonController($client), ...$middlewares));
-            $this->router->addRoute($method, '/rss/{channel}[/[{page}[/]]]', stackMiddleware(new RSSController($client), ...$middlewares));
-            $this->router->addRoute($method, '/media/{channel}/{message_id}[/[{preview}[/[{filename}]]]]', stackMiddleware(new MediaController($client), ...$middlewares));
-            $this->router->addRoute($method, '/icon/{channel}[/[{filename}]]', stackMiddleware(new IconController($client), ...$middlewares));
+            $this->router->addRoute($method, '/json/{channel}[/[{page}[/]]]', stackMiddleware(new JsonController($client), ...$cached('json')));
+            $this->router->addRoute($method, '/rss/{channel}[/[{page}[/]]]', stackMiddleware(new RSSController($client), ...$cached('rss')));
+            $this->router->addRoute($method, '/media/{channel}/{message_id}[/[{preview}[/[{filename}]]]]', stackMiddleware(new MediaController($client), ...$cached('media')));
+            $this->router->addRoute($method, '/icon/{channel}[/[{filename}]]', stackMiddleware(new IconController($client), ...[...$middlewares, new RequestValidatorMiddleware($client)]));
         }
     }
 

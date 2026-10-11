@@ -15,6 +15,7 @@ use TelegramRSS\Cache\FloodWaitException;
 
 class AuthorizationMiddleware implements Middleware
 {
+    /** @var array<string, null> */
     private array $ipBlacklist = [];
     private int $selfIp;
     private string $forbibbenRefererRegex;
@@ -50,7 +51,8 @@ class AuthorizationMiddleware implements Middleware
              * @var User $user
              * @see AccessLoggerMiddleware::handleRequest
              * */
-            $user = $request->getAttribute('user');
+            /** @var \TelegramRSS\AccessControl\User $user */
+        $user = $request->getAttribute('user');
             $referer = $request->getHeader('referer');
             $isStreaming = $request->hasHeader('range');
             if ($referer && $this->forbibbenRefererRegex && !$isStreaming && preg_match("/{$this->forbibbenRefererRegex}/i", $referer)) {

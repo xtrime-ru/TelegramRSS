@@ -6,7 +6,9 @@ use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Router;
 use TelegramRSS\TgClient;
+use TelegramRSS\Cache\CacheContext;
 
+/** @phpstan-import-type History from TgClient */
 abstract class BaseFeedController implements RequestHandler
 {
     private const LIMIT_DEFAULT = 10;
@@ -17,6 +19,9 @@ abstract class BaseFeedController implements RequestHandler
     ) {
     }
 
+    /**
+     * @return array{page: int, limit: int, id: int}
+     */
     public static function getHistoryParameters(Request $request): array
     {
         $page = (int)(
@@ -31,6 +36,10 @@ abstract class BaseFeedController implements RequestHandler
         ];
     }
 
+    /**
+     * @param array{page: int, limit: int, id: int} $params
+     * @return array{limit: int, add_offset: int, offset_id: int}
+     */
     public static function getHistoryQuery(array $params): array
     {
         return [
@@ -40,16 +49,22 @@ abstract class BaseFeedController implements RequestHandler
         ];
     }
 
+    /**
+     * @return History
+     */
     protected function getMessages(Request $request): array
     {
+        /** @var string $channel */
         $channel = $request->getAttribute('channel');
-        $isChannel = in_array($this->client->getInfo($channel)['type'], ['channel', 'supergroup']);
+        $context = CacheContext::fromRequest($request);
+        $isChannel = in_array($this->client->getInfo($channel, context: $context)['type'], ['channel', 'supergroup']);
 
         $result = $this->client->getHistoryHtml(
-            ['peer' => $channel] + self::getHistoryQuery(self::getHistoryParameters($request))
+            ['peer' => $channel] + self::getHistoryQuery(self::getHistoryParameters($request)),
+            $context,
         );
         if ($isChannel) {
-            $result['sponsored_messages'] = $this->client->getSponsoredMessages($channel);
+            $result['sponsored_messages'] = $this->client->getSponsoredMessages($channel, $context);
         }
 
         return $result;

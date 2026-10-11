@@ -15,6 +15,10 @@ class ErrorResponse implements ErrorHandler
         return self::customError($status, ['code' => $status, 'message' => $reason]);
     }
 
+    /**
+     * @param array<array-key, mixed> $errors
+     * @return Response
+     */
     public static function customError(int $status, array $errors) {
         if ($status < 300 || $status > 599) {
             $status = HttpStatus::BAD_REQUEST;
