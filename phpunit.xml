@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         cacheDirectory=".phpunit.cache"
+         failOnWarning="true"
+         failOnRisky="true">
+    <testsuites>
+        <testsuite name="TelegramRSS">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="RPM" value="15" force="true"/>
+        <env name="ERRORS_LIMIT" value="0" force="true"/>
+        <env name="CLIENTS_SETTINGS" value="{}" force="true"/>
+        <env name="SERVER_ADDRESS" value="127.0.0.1" force="true"/>
+    </php>
+</phpunit>

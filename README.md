@@ -10,6 +10,10 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 * fail2ban, RPM limits, IP blacklist
 * Full media support. Access any media from messages via direct links.
 
+Tests use PHPUnit 13 and Mockery. Run `composer test` (or `vendor/bin/phpunit`).
+Each test runs in a separate process without inherited global state. Mocks and
+application settings are initialized inside the test class.
+
 ## Architecture Example
 
 ![Architecture Example](https://hsto.org/webt/j-/ob/ky/j-obkye1dv68ngsrgi12qevutra.png)
