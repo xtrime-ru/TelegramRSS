@@ -11,6 +11,12 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 * Full media support. Access any media from messages via direct links.
 * Shared feed/history cache and media-message reuse across clients
 
+The current lock file requires PHP 8.4.1+ and uses Amp File 4 with Static Content
+`2.x-dev`, pinned to a commit by Composer. The `>=2` constraint permits future stable
+Static Content releases without changing `composer.json`. Symfony RateLimiter and PHPUnit Bridge
+use `>=6.4`; OptionsResolver is selected transitively by RateLimiter. The same
+application code is tested with Symfony 6.4, 7.4 and 8.1.
+
 ## Client request limits
 
 [Symfony RateLimiter](https://symfony.com/doc/6.4/rate_limiter.html) uses the
