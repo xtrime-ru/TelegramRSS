@@ -8,7 +8,6 @@ use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Response;
-use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\AccessControl\User;
 use TelegramRSS\TgClient;
 use TelegramRSS\Config;
@@ -24,9 +23,11 @@ class AuthorizationMiddleware implements Middleware
         $fileName = (string)Config::getInstance()->get('access.ip_blacklist', "");
         $filePath = ROOT_DIR . "/{$fileName}";
         if (is_file($filePath)) {
-            $ips = array_filter(
-                explode("\n", file_get_contents($filePath) ?: "")
-            );
+            $contents = file_get_contents($filePath);
+            if ($contents === false) {
+                throw new \RuntimeException('Failed to read IP blacklist: ' . $filePath);
+            }
+            $ips = array_filter(explode("\n", $contents));
             $this->ipBlacklist = array_fill_keys($ips, null);
         }
         $this->selfIp = ip2long(getHostByName(php_uname('n')));
@@ -37,6 +38,7 @@ class AuthorizationMiddleware implements Middleware
     {
         $host = Server::getClientIp($request);
         $user = null;
+        $retryAfter = null;
 
         try {
             if (!$this->isIpAllowed($host)) {
@@ -48,11 +50,6 @@ class AuthorizationMiddleware implements Middleware
              * @see AccessLoggerMiddleware::handleRequest
              * */
             $user = $request->getAttribute('user');
-            $user->addRequest($request->getUri());
-            if ($user->isRateLimited()) {
-                throw new ClientException($request->getClient(), 'Too many requests', HttpStatus::TOO_MANY_REQUESTS);
-            }
-
             $referer = $request->getHeader('referer');
             $isStreaming = $request->hasHeader('range');
             if ($referer && $this->forbibbenRefererRegex && !$isStreaming && preg_match("/{$this->forbibbenRefererRegex}/i", $referer)) {
@@ -62,9 +59,18 @@ class AuthorizationMiddleware implements Middleware
             if ($user->isBanned()) {
                 throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::TOO_MANY_REQUESTS);
             }
+            $user->addRequest();
+            if ($user->isRateLimited()) {
+                $retryAfter = $user->rateRetryAfter;
+                throw new ClientException($request->getClient(), 'Too many requests', HttpStatus::TOO_MANY_REQUESTS);
+            }
         } catch (\Throwable $e) {
             $errors = array_merge($user ? $user->errors : [], [$e->getMessage()]);
-            return ErrorResponse::customError($e->getCode(), $errors);
+            $response = ErrorResponse::customError($e->getCode(), $errors);
+            if ($retryAfter !== null) {
+                $response->setHeader('Retry-After', (string) $retryAfter);
+            }
+            return $response;
         }
 
         try {
@@ -74,7 +80,8 @@ class AuthorizationMiddleware implements Middleware
                 $user->addError($e->getMessage(), (string)$request->getUri());
             }
             $errors = array_merge($user->errors, [$e->getMessage()]);
-            return ErrorResponse::customError($e->getCode(), $errors);
+            $response = ErrorResponse::customError($e->getCode(), $errors);
+            return $response;
         }
 
         return $response;

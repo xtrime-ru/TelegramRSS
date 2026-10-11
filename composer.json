@@ -24,7 +24,8 @@
         "ext-dom": "*",
         "ext-simplexml": "*",
         "ext-mbstring": "*",
-        "ext-pcntl": "*"
+        "ext-pcntl": "*",
+        "symfony/rate-limiter": "^6.4"
     },
     "prefer-stable": true,
     "minimum-stability": "dev",
@@ -48,6 +49,7 @@
         "test": "phpunit"
     },
     "require-dev": {
+        "symfony/phpunit-bridge": "^6.4",
         "phpunit/phpunit": "^13.0",
         "mockery/mockery": "^1.6"
     }

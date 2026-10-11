@@ -8,14 +8,16 @@ use TelegramRSS\Config;
 use TelegramRSS\Logger;
 
 use function Amp\ByteStream\splitLines;
+use function Amp\File\deleteFile;
 use function Amp\File\isFile;
+use function Amp\File\move;
 use function Amp\File\openFile;
 
 class AccessControl
 {
-    /** @var User[] */
+    /** @var array<array-key, User> */
     private array $users = [];
-    /** @var User[] */
+    /** @var array<array-key, User> */
     private array $mediaUsers = [];
 
     private const FILES = [
@@ -31,7 +33,7 @@ class AccessControl
     private int $mediaRpmLimit;
     private int $mediaErrorsLimit;
 
-    /** @var array<string, array<string, mixed>> */
+    /** @var array<array-key, array{rpm?: int, media_rpm?: int, errors_limit?: int, media_errors_limit?: int, password?: string}> */
     private array $clientsSettings;
 
     public function __construct()
@@ -69,61 +71,118 @@ class AccessControl
 
     private function saveUsers(): void {
         foreach (self::FILES as $path => $object) {
-            $descriptor = openFile($path, 'wb');
-            $memory = '';
-            foreach ($this->{$object} as $key => $value) {
-                $memory .= serialize([$key=>$value]) . PHP_EOL;
+            $temporary = $path . '.tmp';
+            try {
+                $file = openFile($temporary, 'wb');
+                try {
+                    foreach ($this->{$object} as $key => $user) {
+                        $file->write(json_encode([$key => $user->__serialize()],
+                            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
+                    }
+                } finally {
+                    $file->close();
+                }
+                move($temporary, $path);
+            } catch (\Throwable $exception) {
+                Logger::getInstance()->error('Failed to save user-cache snapshot', [
+                    'path' => $path,
+                    'exception' => $exception,
+                ]);
+            } finally {
+                try {
+                    if (isFile($temporary)) {
+                        deleteFile($temporary);
+                    }
+                } catch (\Throwable $exception) {
+                    Logger::getInstance()->error('Failed to remove temporary user-cache snapshot', [
+                        'path' => $temporary,
+                        'exception' => $exception,
+                    ]);
+                }
             }
-            $descriptor->write($memory);
-            $descriptor->close();
         }
     }
 
     private function loadUsers(): void {
         foreach (self::FILES as $path => $object) {
-            if(isFile($path)) {
-                $file = openFile($path, 'rb');
-                while(!$file->eof()) {
-                    foreach (splitLines($file) as $line) {
-                        $line = trim($line);
-                        $item = unserialize($line, ['allowed_classes'=>[User::class]]);
-                        if (is_array($item)) {
-                            foreach ($item as $ip => $user) {
-                                $this->{$object}[$ip] = $user;
-                            }
-                        }
-
+            if (!isFile($path)) {
+                continue;
+            }
+            $file = openFile($path, 'rb');
+            try {
+                foreach (splitLines($file) as $line) {
+                    foreach (self::decodeUserRecord(trim($line)) as $key => $user) {
+                        $this->{$object}[$key] = $this->configuredUser($key, $object === 'mediaUsers', $user);
                     }
                 }
-            } else {
-                $this->{$object} = [];
+            } finally {
+                $file->close();
             }
         }
     }
 
+    /** @return array<array-key, User> */
+    private static function decodeUserRecord(string $line): array
+    {
+        try {
+            $legacy = str_starts_with($line, 'a:');
+            $record = $legacy
+                ? @unserialize($line, ['allowed_classes' => false])
+                : json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            if (!is_array($record)) {
+                return [];
+            }
+            $users = [];
+            foreach ($record as $key => $data) {
+                if ($legacy) {
+                    $data = (array) $data;
+                    if (($data['__PHP_Incomplete_Class_Name'] ?? null) !== User::class) {
+                        continue;
+                    }
+                    $prefix = "\0" . User::class . "\0";
+                    // Only the original one-user PHP records are eligible for conversion.
+                    if (count($record) !== 1 || !isset($data[$prefix . 'requests'])) {
+                        continue;
+                    }
+                    $data = [
+                        'rpmLimit' => $data['rpmLimit'],
+                        'errorsLimit' => $data['errorsLimit'],
+                        'errors' => $data['errors'],
+                        'banLastDuration' => $data['banLastDuration'],
+                        'banUntilTs' => $data[$prefix . 'banUntilTs'],
+                        'lastRequestTs' => max($data[$prefix . 'requests'] ?: [0]),
+                    ];
+                }
+                if (!is_array($data)) {
+                    continue;
+                }
+                $user = new User();
+                $user->__unserialize($data);
+                $users[$key] = $user;
+            }
+            return $users;
+        } catch (\Throwable) {
+            return []; // A malformed line must not prevent the remaining users from loading.
+        }
+    }
+
+    /**
+     * @param 'default'|'media' $type
+     */
     public function getOrCreateUser(string $clientKey, string $type = 'default'): User
     {
+        $media = $type === 'media';
+        $collection = $media ? 'mediaUsers' : 'users';
+        return $this->{$collection}[$clientKey] ??= $this->configuredUser($clientKey, $media);
+    }
+
+    private function configuredUser(string $clientKey, bool $media, ?User $user = null): User
+    {
         $settings = $this->clientsSettings[$clientKey] ?? [];
-
-        if ($type === 'media') {
-            if (!isset($this->mediaUsers[$clientKey])) {
-                $this->mediaUsers[$clientKey] = new User();
-            }
-
-            $this->mediaUsers[$clientKey]->rpmLimit = $settings['media_rpm'] ?? $settings['rpm'] ?? $this->mediaRpmLimit;
-            $this->mediaUsers[$clientKey]->errorsLimit = $settings['media_errors_limit'] ?? $settings['errors_limit'] ?? $this->mediaErrorsLimit;
-
-            return $this->mediaUsers[$clientKey];
-        } else {
-            if (!isset($this->users[$clientKey])) {
-                $this->users[$clientKey] = new User();
-            }
-
-            $this->users[$clientKey]->rpmLimit = $settings['rpm'] ?? $this->rpmLimit;
-            $this->users[$clientKey]->errorsLimit = $settings['errors_limit'] ?? $this->errorsLimit;
-
-            return $this->users[$clientKey];
-        }
+        $prefix = $media ? 'media_' : '';
+        $rpm = (int) ($settings[$prefix . 'rpm'] ?? $settings['rpm'] ?? ($media ? $this->mediaRpmLimit : $this->rpmLimit));
+        $errors = (int) ($settings[$prefix . 'errors_limit'] ?? $settings['errors_limit'] ?? ($media ? $this->mediaErrorsLimit : $this->errorsLimit));
+        return $user ? $user->configure($rpm, $errors) : new User($rpm, $errors);
     }
 
     public function checkAuth(?string $authorizationHeader = null): ?string

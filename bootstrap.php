@@ -27,7 +27,12 @@ if (!is_file($envPath) || filesize($envPath) === 0) {
     echo "No {$envPath} file found. Making copy of {$envPathExample} \r";
     //Dont use copy because of docker symlinks
     $envContent = file_get_contents($envPathExample);
-    file_put_contents($envPath, $envContent);
+    if ($envContent === false) {
+        throw new \RuntimeException('Failed to read environment example: ' . $envPathExample);
+    }
+    if (file_put_contents($envPath, $envContent) !== strlen($envContent)) {
+        throw new \RuntimeException('Failed to write environment file: ' . $envPath);
+    }
 }
 //Check if root env file hash been loaded (in case plugin installed in existing project)
 if (!getenv('SERVER_ADDRESS')) {

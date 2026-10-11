@@ -27,7 +27,7 @@ class AccessLoggerMiddleware implements Middleware
         $protocolVersion = $request->getProtocolVersion();
 
         $authorizationHeader = $request->getHeader('authorization');
-        $clientType = str_contains($uri, '/media/') ? 'media' : 'default';
+        $clientType = str_starts_with($request->getUri()->getPath(), '/media/') ? 'media' : 'default';
         $username = $this->accessControl->checkAuth($authorizationHeader);
         $user = $this->accessControl->getOrCreateUser($username ?: $remote, $clientType);
         $request->setAttribute('user', $user);
@@ -39,7 +39,6 @@ class AccessLoggerMiddleware implements Middleware
             'referer' => $request->getHeader('referer'),
             'remote' => $remote,
             'username' => $username,
-            'rpm' => $user->rpm,
             'rpm_limit' => $user->rpmLimit,
             'errors' => count($user->errors),
             'errors_limit' => $user->errorsLimit,
@@ -66,6 +65,15 @@ class AccessLoggerMiddleware implements Middleware
 
         $status = $response->getStatus();
         $reason = $response->getReason();
+        $context['errors'] = count($user->errors);
+        $context['previous_ban'] = $user->banLastDuration;
+        $context['banned'] = (int) $user->isBanned();
+        $context['rate_limit_policy'] = $user->rpmLimit === -1 ? 'no_limit' : 'sliding_window';
+        $rateLimit = $user->getRateLimit();
+        $context['rate_limit_remaining'] = $rateLimit?->getRemainingTokens();
+        $context['rate_limit_used'] = $rateLimit ? $rateLimit->getLimit() - $rateLimit->getRemainingTokens() : null;
+        $context['rate_limit_retry_after'] = $user->rateRetryAfter;
+
 
         $context = [
             'request' => $context,

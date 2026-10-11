@@ -2,18 +2,23 @@
 
 namespace TelegramRSS\AccessControl;
 
+use Symfony\Component\RateLimiter\Policy\SlidingWindowLimiter;
+use Symfony\Component\RateLimiter\RateLimit;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+
 class User
 {
     public int $rpmLimit = 15;
     public int $errorsLimit = 0;
-    public int $rpm = 0;
+    public int $rateRemaining = 0;
+    public int $rateRetryAfter = 0;
+    private bool $rateLimited = false;
+    private ?SlidingWindowLimiter $limiter = null;
+    private int $lastRequestTs = 0;
 
-    /** @var int[] array of timestamps */
-    private array $requests = [];
-
+    /** @var list<array{message: string, url: string, ts: int}> */
     public array $errors = [];
 
-    private bool $permanentBan = false;
     public int $banLastDuration = 0;
     private int $banUntilTs = 0;
 
@@ -34,13 +39,54 @@ class User
 
     public function __construct(?int $rpmLimit = null, ?int $errorsLimit = null)
     {
-        $this->rpmLimit = $rpmLimit ?? $this->rpmLimit;
-        $this->errorsLimit = $errorsLimit ?? $this->errorsLimit;
-
+        $this->configure($rpmLimit ?? 15, $errorsLimit ?? 0);
         if ($this->rpmLimit === 0) {
-            $this->permanentBan = true;
             $this->addError("Request from this IP forbidden", '');
         }
+    }
+
+    /** Apply startup settings to a new or restored user. */
+    public function configure(int $rpmLimit, int $errorsLimit): self
+    {
+        if ($rpmLimit < -1) {
+            throw new \InvalidArgumentException('RPM must be -1, 0 or positive');
+        }
+        if ($rpmLimit !== $this->rpmLimit) {
+            $this->limiter = null;
+            $this->rateLimited = false;
+            $this->rateRemaining = $this->rateRetryAfter = 0;
+        }
+        $this->rpmLimit = $rpmLimit;
+        $this->errorsLimit = $errorsLimit;
+        return $this;
+    }
+
+    /**
+     * @return array{rpmLimit: int, errorsLimit: int, lastRequestTs: int, errors: list<array{message: string, url: string, ts: int}>, banLastDuration: int, banUntilTs: int}
+     */
+    public function __serialize(): array
+    {
+        return [
+            'rpmLimit' => $this->rpmLimit,
+            'errorsLimit' => $this->errorsLimit,
+            'lastRequestTs' => $this->lastRequestTs,
+            'errors' => $this->errors,
+            'banLastDuration' => $this->banLastDuration,
+            'banUntilTs' => $this->banUntilTs,
+        ];
+    }
+
+    /**
+     * @param array{rpmLimit?: int, errorsLimit?: int, lastRequestTs?: int, errors?: list<array{message: string, url: string, ts: int}>, banLastDuration?: int, banUntilTs?: int} $data
+     */
+    public function __unserialize(array $data): void
+    {
+        $this->rpmLimit = $data['rpmLimit'] ?? 15;
+        $this->errorsLimit = $data['errorsLimit'] ?? 0;
+        $this->lastRequestTs = $data['lastRequestTs'] ?? 0;
+        $this->errors = $data['errors'] ?? [];
+        $this->banLastDuration = $data['banLastDuration'] ?? 0;
+        $this->banUntilTs = $data['banUntilTs'] ?? 0;
     }
 
     public function isOld(?int $now = null): bool
@@ -54,36 +100,56 @@ class User
         ;
     }
 
-    public function addRequest(string $url): void
+    public function addRequest(): void
     {
         if ($this->isBanned()) {
             return;
         }
 
-        $this->requests[] = time();
-        $this->rpm = $this->getRPM();
+        $this->lastRequestTs = time();
+        $this->rateLimited = false;
+        $this->rateRetryAfter = 0;
+        if ($this->rpmLimit === -1) {
+            return;
+        }
+        $result = $this->getLimiter()->consume();
+        $this->rateLimited = !$result->isAccepted();
+        $this->rateRemaining = $result->getRemainingTokens();
+        if ($this->rateLimited) {
+            $this->rateRetryAfter = max(1, (int) ceil($result->getRetryAfter()->getTimestamp() - microtime(true)));
+        }
     }
 
-    public function isRateLimited(): bool {
-        if ($this->rpmLimit === -1) {
-            return false;
-        }
-        return $this->rpm > $this->rpmLimit;
+    public function isRateLimited(): bool
+    {
+        return $this->rpmLimit === 0 || $this->rateLimited;
+    }
+
+    /** Read the current Symfony quota without consuming a request. */
+    public function getRateLimit(): ?RateLimit
+    {
+        return $this->rpmLimit > 0 ? $this->getLimiter()->consume(0) : null;
+    }
+
+    private function getLimiter(): SlidingWindowLimiter
+    {
+        return $this->limiter ??= new SlidingWindowLimiter('requests-', $this->rpmLimit,
+            new \DateInterval('PT1M'), new InMemoryStorage());
     }
 
     public function getLastAccessTs(): int
     {
-        return end($this->requests);
+        return $this->lastRequestTs;
     }
 
     public function isBanned(): bool
     {
-        return $this->permanentBan || $this->banUntilTs > time();
+        return $this->rpmLimit === 0 || $this->banUntilTs > time();
     }
 
     public function getBanDuration(): ?string
     {
-        if (!$this->permanentBan) {
+        if ($this->rpmLimit !== 0) {
             $timeLeft = $this->banUntilTs - time();
 
             if ($timeLeft > 0) {
@@ -125,15 +191,14 @@ class User
         }
     }
 
-    private function getRPM(): int
-    {
-        $this->trimByTtl($this->requests, static::RPM_TTL);
-        return \count($this->requests);
-    }
-
+    /**
+     * @template T of int|float|array<string, mixed>
+     * @param list<T> $array
+     * @return list<T>
+     */
     private function trimByTtl(array &$array, string $ttl, ?string $tsKey = 'ts'): array
     {
-        $ttlTs = strtotime($ttl);
+        $ttlTs = strtotime($ttl, time());
 
         $oldCount = 0;
         foreach ($array as $key => $item) {

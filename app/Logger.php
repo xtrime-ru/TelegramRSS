@@ -29,6 +29,7 @@ class Logger extends AbstractLogger
 {
     private static ?Logger $instanse = null;
 
+    /** @var array<string, int> */
     public static array $levels = [
         LogLevel::DEBUG => 0,
         LogLevel::INFO => 1,
@@ -43,9 +44,12 @@ class Logger extends AbstractLogger
     private static string $dateTimeFormat = 'Y-m-d H:i:s';
     public int $minLevelIndex;
 
-    /** @var callable(string $level, string $message, array $context): string  */
+    /** @var callable(string, string, array<string, mixed>): string  */
     private $formatter;
 
+    /**
+     * @param (callable(string, string, array<string, mixed>): string)|null $formatter
+     */
     protected function __construct(string $minLevel = LogLevel::WARNING, ?callable $formatter = null)
     {
         if (null === $minLevel) {
@@ -89,6 +93,11 @@ class Logger extends AbstractLogger
     /**
      * {@inheritdoc}
      */
+    /**
+     * @param string $level
+     * @param string|\Stringable $message
+     * @param array<string, mixed> $context
+     */
     public function log($level, $message, array $context = []): void
     {
         if (!isset(self::$levels[$level])) {
@@ -104,6 +113,7 @@ class Logger extends AbstractLogger
         echo $formatter($level, $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     private function format(string $level, string $message, array $context): string
     {
         if (false !== strpos($message, '{')) {
@@ -146,6 +156,9 @@ class Logger extends AbstractLogger
             ) . PHP_EOL;
     }
 
+    /**
+     * @return array{exception: class-string<\Throwable>, message: string, file: string, line: int, code: int|string, backtrace: list<string>, 'previous exception': array<string, mixed>|null}
+     */
     public static function getExceptionAsArray(\Throwable $exception) {
         return [
             'exception' => get_class($exception),

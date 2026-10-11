@@ -7,12 +7,56 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 * Fast async [amphp](https://github.com/amphp/) http server
 * Use as micro-service to access Telegram API
 * Get any public telegram posts from groups as json or RSS
-* fail2ban, RPM limits, IP blacklist
+* fail2ban, Symfony token-bucket request limits, IP blacklist
 * Full media support. Access any media from messages via direct links.
 
+## Client request limits
+
+[Symfony RateLimiter](https://symfony.com/doc/6.4/rate_limiter.html) uses the
+`sliding_window` policy with a 60-second window to restrict requests before cache
+access or API calls. It estimates recent usage from the current and previous
+windows, smoothing the transition between them. One IP shares a quota across
+channels; an authenticated Basic Auth username shares its quota across all IPs.
+RSS, JSON and icon requests share the feed quota. Media, preview and Range requests
+use an independent media quota, with each stream consuming one request.
+
+| Environment variable | Default | Meaning |
+| --- | --- | --- |
+| `RPM` | `15` | Feed/icon requests per minute |
+| `MEDIA_RPM` | `50` | Media requests per minute |
+
+`CLIENTS_SETTINGS` supports `rpm`, `media_rpm`, `errors_limit` and
+`media_errors_limit` overrides. Media inherits client `rpm` when its own override
+is absent. `rpm=-1` disables the quota and `rpm=0` denies access. Burst settings are
+no longer used. Requests exceeding the quota get HTTP 429 and `Retry-After`,
+including cache hits; rejections do not reserve future capacity or escalate bans.
+
+Settings are applied when users are created or restored at startup and remain
+fixed until restart. Saved bans/errors and last activity are preserved. Quotas
+exist only in memory and start empty after restoring users or restarting the
+process. Changing a limit resets that user's quota; unchanged runtime settings
+retain it.
+
+User-cache snapshots use JSONL: one client and its persistent fields per line.
+Reading and writing stream records without buffering the complete file. Newlines
+inside errors are escaped by JSON and restored when decoded. Limiter objects,
+quota counters and Retry-After are excluded; no base64 encoding is needed.
+Snapshots are written to a temporary file and atomically renamed after a successful
+close, preserving the previous snapshot if writing fails. Only the original
+one-user PHP serialized lines are converted as they are read, preserving bans, errors
+and last activity. Invalid lines are skipped. The next snapshot writes JSONL;
+no separate migration pass or intermediate serialized format is supported.
+State belongs to one process; multiple workers do not
+share quotas. Access logs include `rpm_limit`, `rate_limit_policy`,
+`rate_limit_remaining`, `rate_limit_used` and `rate_limit_retry_after`. Remaining
+and used quota come from Symfony's read-only `consume(0)` result. `rate_limit_used`
+is the sliding-window estimate of accepted requests, excludes rejected attempts,
+and is `null` when the quota is disabled or access is denied with `rpm=0`.
+The separate per-user RPM counter is removed.
+
 Tests use PHPUnit 13 and Mockery. Run `composer test` (or `vendor/bin/phpunit`).
-Each test runs in a separate process without inherited global state. Mocks and
-application settings are initialized inside the test class.
+Each test runs in a separate process without inherited global state. Mocks,
+application settings and Symfony `ClockMock` are initialized inside the test class.
 
 ## Architecture Example
 
