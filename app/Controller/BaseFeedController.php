@@ -17,40 +17,36 @@ abstract class BaseFeedController implements RequestHandler
     ) {
     }
 
-    protected function getPage(Request $request): int
+    public static function getHistoryParameters(Request $request): array
     {
         $page = (int)(
             $request->getAttribute(Router::class)['page']
             ?? $request->getQueryParameter('page')
             ?: 1
         );
-        return max(1, $page);
+        return [
+            'page' => max(1, $page),
+            'limit' => max(1, min((int)($request->getQueryParameter('limit') ?? self::LIMIT_DEFAULT), self::LIMIT_MAX)),
+            'id' => (int)($request->getQueryParameter('id') ?? 0),
+        ];
     }
 
-    protected function getLimit(Request $request): int
+    public static function getHistoryQuery(array $params): array
     {
-        $limit = (int)($request->getQueryParameter('limit') ?? self::LIMIT_DEFAULT);
-        return max(1, min($limit, self::LIMIT_MAX));
+        return [
+            'limit' => $params['limit'],
+            'add_offset' => ($params['page'] - 1) * $params['limit'],
+            'offset_id' => $params['id'] ? $params['id'] + 1 : 0,
+        ];
     }
 
-    protected function getId(Request $request): int
+    protected function getMessages(Request $request): array
     {
-        return (int)($request->getQueryParameter('id') ?? 0);
-    }
-
-    abstract protected function getHeaders(): array;
-
-    protected function getMessages(string $channel, int $page, int $limit, int $message_id = 0): array
-    {
+        $channel = $request->getAttribute('channel');
         $isChannel = in_array($this->client->getInfo($channel)['type'], ['channel', 'supergroup']);
 
         $result = $this->client->getHistoryHtml(
-            [
-                'peer' => $channel,
-                'limit' => $limit,
-                'add_offset' => ($page - 1) * $limit,
-                'offset_id' => $message_id ? ($message_id + 1) : 0,
-            ]
+            ['peer' => $channel] + self::getHistoryQuery(self::getHistoryParameters($request))
         );
         if ($isChannel) {
             $result['sponsored_messages'] = $this->client->getSponsoredMessages($channel);

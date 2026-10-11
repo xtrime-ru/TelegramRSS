@@ -19,23 +19,11 @@ class MediaController implements RequestHandler
 
     public function handleRequest(Request $request): Response
     {
-        if ($this->getPreview($request)) {
-            $response = $this->client->getMediaPreview(
-                [
-                    'peer' => $request->getAttribute('channel'),
-                    'id' => [$this->getMessageId($request)],
-                ],
-                $request->getHeaders()
-            );
-        } else {
-            $response = $this->client->getMedia(
-                [
-                    'peer' => $request->getAttribute('channel'),
-                    'id' => [$this->getMessageId($request)],
-                ],
-                $request->getHeaders()
-            );
-        }
+        $response = $this->client->getMedia(
+            ['peer' => $request->getAttribute('channel'), 'id' => [$this->getMessageId($request)]],
+            $request->getHeaders(),
+            $this->getPreview($request),
+        );
 
         return new Response($response->getStatus(), $response->getHeaders(), $response->getBody());
     }

@@ -6,6 +6,7 @@ namespace TelegramRSS;
 
 class Config {
     private static Config $instance;
+    /** @var array<string, mixed> */
     public array $config;
 
     public static function getInstance(): Config
@@ -27,15 +28,19 @@ class Config {
     }
 
     /**
-     * @param string $key
-     * @param null $default
-     * @return mixed|null
+     * @param string $key Dot-separated configuration path.
+     * @param mixed $default
+     * @return mixed
      */
     public function get($key = '', $default = null)
     {
         return $this->findByKey($key) ?? $default;
     }
 
+    /**
+     * @param string $key
+     * @return mixed
+     */
     private function findByKey($key)
     {
         $key = (string) $key;

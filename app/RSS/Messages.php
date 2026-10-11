@@ -10,11 +10,17 @@ use TelegramRSS\TgClient;
 use function Amp\async;
 use function Amp\Future\await;
 
+/**
+ * @phpstan-import-type History from TgClient
+ * @phpstan-type FeedItem array{url: string, title: string, description: string, media: list<array<string, mixed>|null>, preview: list<array{href: string|null, image: string|null}>, timestamp: int, views: int|null, forwards: int|null, reactions: array<string, int>|null, source?: array{url: string, title: string}, webpage?: array<string, mixed>}
+ */
 class Messages
 {
     private const TELEGRAM_URL = 'https://t.me/';
 
+    /** @var list<FeedItem> */
     private array $list = [];
+    /** @var History */
     private array $telegramResponse;
     private string $channelUrl;
     private string $username;
@@ -27,6 +33,9 @@ class Messages
         'messageMediaWebPage',
     ];
 
+    /**
+     * @param History $telegramResponse
+     */
     public function __construct(array $telegramResponse, TgClient $client, string $peer)
     {
         $this->telegramResponse = $telegramResponse;
@@ -41,7 +50,9 @@ class Messages
         if ($messages = $this->telegramResponse['messages'] ?? []) {
             $messages = array_merge($this->telegramResponse['sponsored_messages'] ?? [], $messages);
 
+            /** @var list<array<string, mixed>> $groupedMessages */
             $groupedMessages = [];
+            /** @var array<int, \Amp\Future<array<string, mixed>|null>> $futures */
             $futures = [];
             foreach ($messages as $message) {
                 $futures[$message['id']] = async($this->getMediaInfo(...), $message);
@@ -80,7 +91,7 @@ class Messages
                     if (!empty($message['fwd_from']['from_id']) && !empty($message['fwd_from']['channel_post'])) {
                         $info = [];
                         try {
-                            $info = $this->client->getInfo($message['fwd_from']['from_id']);
+                            $info = $this->client->getInfo($message['fwd_from']['from_id'], $this->username);
                             $info = $info[array_key_first($info)] ?? [];
                         } catch (\Throwable) {
                         }
@@ -121,7 +132,8 @@ class Messages
                                 $parsedMessage['media'][] = $info;
                             }
                         }
-                        $groupedMessages = [];
+                        /** @var list<array<string, mixed>> $groupedMessages */
+            $groupedMessages = [];
                     }
 
                     if (!empty($message['media']['webpage'])) {
@@ -144,6 +156,11 @@ class Messages
         return $this;
     }
 
+    /**
+     * @param FeedItem $parsedMessage
+     * @param array<string, mixed> $message
+     * @return FeedItem
+     */
     private function setTitle(array $parsedMessage, array $message): array
     {
         $descriptionText = strip_tags($parsedMessage['description']);
@@ -181,6 +198,9 @@ class Messages
         return $parsedMessage;
     }
 
+    /**
+     * @param array<string, mixed> $message
+     */
     private function getMessageUrl(array $message): string
     {
         if ($message['_'] === 'sponsoredMessage') {
@@ -212,6 +232,10 @@ class Messages
         }
     }
 
+    /**
+     * @param array<string, mixed> $message
+     * @return array{size?: int, mime?: string, name?: string, ext?: string, url?: string, ...}|null
+     */
     private function getMediaInfo(array $message): ?array
     {
         if (!$this->hasMedia($message)) {
@@ -222,7 +246,7 @@ class Messages
         } else {
             $media = $message['media'];
         }
-        $info = $this->client->getMediaInfo($media);
+        $info = $this->client->getMediaInfo($media, $this->username);
         if (!empty($info['size']) && !empty($info['mime'])) {
             $info['url'] = $this->getMediaUrl($message, $info, false);
             return $info;
@@ -231,6 +255,9 @@ class Messages
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $message
+     */
     private function hasMedia(array $message): bool
     {
         if (
@@ -248,6 +275,10 @@ class Messages
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $message
+     * @param array<string, mixed>|null $info
+     */
     private function getMediaUrl(array $message, ?array $info, bool $preview = false): ?string
     {
         if (!$this->hasMedia($message)) {
@@ -268,7 +299,7 @@ class Messages
     }
 
     /**
-     * @return array
+     * @return list<FeedItem>
      */
     public function get(): array
     {

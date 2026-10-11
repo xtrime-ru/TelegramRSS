@@ -11,6 +11,7 @@ use Amp\Http\Server\Response;
 use TelegramRSS\AccessControl\User;
 use TelegramRSS\TgClient;
 use TelegramRSS\Config;
+use TelegramRSS\Cache\FloodWaitException;
 
 class AuthorizationMiddleware implements Middleware
 {
@@ -81,6 +82,9 @@ class AuthorizationMiddleware implements Middleware
             }
             $errors = array_merge($user->errors, [$e->getMessage()]);
             $response = ErrorResponse::customError($e->getCode(), $errors);
+            if ($e instanceof FloodWaitException) {
+                $response->setHeader('Retry-After', (string) $e->retryAfter);
+            }
             return $response;
         }
 

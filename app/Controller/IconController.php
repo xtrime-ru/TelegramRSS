@@ -19,7 +19,7 @@ class IconController implements RequestHandler
 
         $propicInfo = $this->client->getPropicInfo($request->getAttribute('channel'));
 
-        $response = $this->client->downloadToResponse($propicInfo, $request->getHeaders());
+        $response = $this->client->downloadToResponse($propicInfo, $request->getHeaders(), $request->getAttribute('channel'));
 
         return new Response($response->getStatus(), $response->getHeaders(), $response->getBody());
     }

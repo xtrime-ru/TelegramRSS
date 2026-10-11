@@ -71,6 +71,29 @@ Keys are hashed to comply with PSR-6 restrictions. The cache resets on restart.
 The cache provides age-limited lookup of the last successful result; only feed
 middleware may use it for fallback. History and messages have no stale fallback.
 
+TgClient shares the latest 100-message history snapshot across limits and pages.
+Only fully covered ranges (or the confirmed end of history) are sliced. Older,
+anchored and partially covered ranges use the original uncached API query.
+Successful history seeds the message index; getMessages refreshes expired or
+missing entries. Missing messages are not negatively cached. Concurrent updates
+may retain an older snapshot until the next refresh. Media shares messages but
+uses independent original/preview/Range streams; file bytes and icons are not cached.
+
+Request context is passed explicitly to TgClient, including async sponsored
+lookups. CacheContext tracks response eligibility, source age and log fields;
+TelegramCache holds no current-request state. Calls without context retain their
+existing behaviour, including uncached icon/direct getInfo calls.
+
+Settings are configured through env and take effect after restart:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CACHE_ENABLED` | `1` | Enable cache storage and reuse |
+| `CACHE_MAX_ENTRIES` | `2000` | Maximum records; `0` disables storage |
+| `CACHE_TTL_SECONDS` | `60` | Freshness; `0` disables fresh reuse |
+| `CACHE_STALE_TTL_SECONDS` | `900` | Complete-feed fallback age; `0` disables fallback |
+| `CACHE_HISTORY_WINDOW_SIZE` | `100` | History window size, 1–100 |
+
 Tests use PHPUnit 13 and Mockery. Run `composer test` (or `vendor/bin/phpunit`).
 Each test runs in a separate process without inherited global state. Mocks,
 application settings and Symfony `ClockMock` are initialized inside the test class.

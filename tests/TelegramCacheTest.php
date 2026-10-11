@@ -2,13 +2,15 @@
 
 namespace TelegramRSS\Tests;
 
+use Amp\Http\Client\DelegateHttpClient;
+use Amp\Http\Client\HttpClient;
 use Amp\Http\Server\Driver\Client;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use Amp\Socket\InternetAddress;
-
+use Closure;
 use League\Uri\Http;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -30,6 +32,15 @@ use TelegramRSS\Config;
 
 use TelegramRSS\Server\AccessLoggerMiddleware;
 use TelegramRSS\Server\AuthorizationMiddleware;
+
+use TelegramRSS\TgClient;
+use Throwable;
+use UnexpectedValueException;
+
+use function Amp\async;
+
+use function Amp\delay;
+use function Amp\Future\await;
 
 #[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
@@ -133,5 +144,75 @@ final class TelegramCacheTest extends TestCase
     private function cacheResult(TelegramCache $cache, mixed $value): CacheResult
     {
         return new CacheResult($value, $cache->now(), 'api', CacheStatus::MISS);
+    }
+
+    public function testMessagesAreScopedToChannelAndAbsenceFromHistoryDoesNotDeleteThem(): void
+    {
+        [$clock, , $api, $client] = $this->createClient();
+        $client->getHistoryHtml(['peer' => 'test']);
+        $client->getMessage('other', 7);
+        self::assertSame(1, $api->count('getMessages'));
+        $api->handlers['getHistoryHtml'] = fn ($r) => $api->response($r, ['messages' => [['_' => 'messageEmpty', 'id' => 7], ['_' => 'sponsoredMessage', 'id' => 7]]]);
+        $client->getHistoryHtml(['peer' => 'empty']);
+        $client->getMessage('empty', 7);
+        $client->getHistoryHtml(['peer' => 'test', 'add_offset' => 100]);
+        self::assertSame('Version 1', $client->getMessage('test', 7)['message']);
+        self::assertSame(2, $api->count('getMessages'));
+        $clock->time += 60;
+        $api->version = 2;
+        self::assertSame($api->message(7), $client->getMessage('test', 7));
+        self::assertSame(3, $api->count('getMessages'));
+    }
+
+    public function testConcurrentMessageRequestsShareOneLoadAndFailuresCanBeRetried(): void
+    {
+        [, , $api, $client] = $this->createClient();
+        $api->handlers['getMessages'] = function ($r) use ($api) {
+            delay(0.01);
+            return $api->response($r, ['messages' => [$api->message(7)]]);
+        };
+        $messages = await([async(fn () => $client->getMessage('test', 7)), async(fn () => $client->getMessage('@TEST', 7))]);
+        self::assertSame([$api->message(7), $api->message(7)], $messages);
+        self::assertSame(1, $api->count('getMessages'));
+        $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'CHANNEL_PRIVATE');
+        self::assertThrows(fn () => $client->getMessage('test', 9), UnexpectedValueException::class);
+        unset($api->handlers['getMessages']);
+        self::assertSame(9, $client->getMessage('test', 9)['id']);
+    }
+
+    private function createApiClient(ApiFixture $api): HttpClient
+    {
+        $delegate = Mockery::mock(DelegateHttpClient::class);
+        $delegate->shouldReceive('request')->andReturnUsing($api->request(...));
+        return new HttpClient($delegate, []);
+    }
+
+    /**
+     * @return array{Clock, TelegramCache, ApiFixture, TgClient}
+     */
+    private function createClient(bool $enabled = true): array
+    {
+        $clock = new Clock();
+        $cache = new TelegramCache($enabled, clock: fn () => $clock->time);
+        $api = new ApiFixture();
+        $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
+        return [$clock, $cache, $api, $client];
+    }
+
+    /**
+     * @template T of Throwable
+     * @param Closure(): mixed $callback
+     * @param class-string<T> $class
+     * @return T
+     */
+    private static function assertThrows(Closure $callback, string $class): Throwable
+    {
+        try {
+            $callback();
+        } catch (Throwable $e) {
+            self::assertInstanceOf($class, $e);
+            return $e;
+        }
+        self::fail('Expected exception ' . $class);
     }
 }
