@@ -54,6 +54,23 @@ is the sliding-window estimate of accepted requests, excludes rejected attempts,
 and is `null` when the quota is disabled or access is denied with `rpm=0`.
 The separate per-user RPM counter is removed.
 
+## Shared cache policy
+
+Loaders always return `CacheResult<T>`. `remember()` only checks TTL, coalesces
+loads through Future and stores non-BYPASS results. It propagates API errors;
+complete-feed middleware handles FLOOD_WAIT fallback when introduced.
+
+`TelegramCache` reuses successful results for a fixed TTL (60 seconds by default).
+Cache hits retain the original load time. Concurrent loads share an Amp Future,
+released after either success or error. FLOOD_WAIT pauses all API methods for the
+normalized peer; other peers remain available. Expired pauses are pruned.
+
+Symfony's PSR-6 `ArrayAdapter` stores independent value copies and evicts the
+least recently used records beyond the 2,000-entry default. There is no byte limit.
+Keys are hashed to comply with PSR-6 restrictions. The cache resets on restart.
+The cache provides age-limited lookup of the last successful result; only feed
+middleware may use it for fallback. History and messages have no stale fallback.
+
 Tests use PHPUnit 13 and Mockery. Run `composer test` (or `vendor/bin/phpunit`).
 Each test runs in a separate process without inherited global state. Mocks,
 application settings and Symfony `ClockMock` are initialized inside the test class.

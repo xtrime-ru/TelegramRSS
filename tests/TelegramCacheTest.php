@@ -22,6 +22,9 @@ use Symfony\Bridge\PhpUnit\ClockMock;
 use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;
+use TelegramRSS\Cache\TelegramCache;
+use TelegramRSS\Cache\CacheResult;
+use TelegramRSS\Cache\CacheStatus;
 
 use TelegramRSS\Config;
 
@@ -108,5 +111,27 @@ final class TelegramCacheTest extends TestCase
         $request->setAttribute(Router::class, ['channel' => $channel, 'message_id' => 7]);
         $request->setAttribute('user', new User(1000, 0));
         return $request;
+    }
+
+    public function testLeastRecentlyUsedEntryIsEvictedAtTheConfiguredLimit(): void
+    {
+        $cache = new TelegramCache(maxEntries: 2);
+        $load = fn (string $value) => fn () => $this->cacheResult($cache, $value);
+        $cache->remember('a', $load('a'));
+        $cache->remember('b', $load('b'));
+        $cache->remember('a', $load('unexpected'));
+        $cache->remember('c', $load('c'));
+        self::assertSame('a', $cache->remember('a', $load('unexpected'))->value);
+        self::assertSame('reloaded', $cache->remember('b', $load('reloaded'))->value);
+    }
+
+    /**
+     * @template T
+     * @param T $value
+     * @return CacheResult<T>
+     */
+    private function cacheResult(TelegramCache $cache, mixed $value): CacheResult
+    {
+        return new CacheResult($value, $cache->now(), 'api', CacheStatus::MISS);
     }
 }

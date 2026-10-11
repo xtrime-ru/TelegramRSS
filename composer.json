@@ -25,7 +25,8 @@
         "ext-simplexml": "*",
         "ext-mbstring": "*",
         "ext-pcntl": "*",
-        "symfony/rate-limiter": "^6.4"
+        "symfony/rate-limiter": "^6.4",
+        "symfony/cache": ">=6.4"
     },
     "prefer-stable": true,
     "minimum-stability": "dev",
