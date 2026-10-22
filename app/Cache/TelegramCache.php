@@ -51,7 +51,7 @@ final class TelegramCache
      * @param \Closure(): CacheResult<T> $loader
      * @return CacheResult<T>
      */
-    public function remember(string $key, \Closure $loader): CacheResult
+    public function get(string $key, \Closure $loader): CacheResult
     {
         if (!$this->enabled) {
             return $loader()->withStatus(CacheStatus::BYPASS);
@@ -84,6 +84,25 @@ final class TelegramCache
         } finally {
             unset($this->loading[$key]);
         }
+    }
+
+    /**
+     * @template T
+     * @param \Closure(): CacheResult<T> $loader
+     * @param (\Closure(): bool)|null $canUseStale Checked after loading, when response eligibility is known.
+     * @return CacheResult<T>
+     */
+    public function getWithStale(string $key, \Closure $loader, ?\Closure $canUseStale = null): CacheResult
+    {
+        return $this->get($key, function () use ($key, $loader, $canUseStale): CacheResult {
+            try {
+                return $loader();
+            } catch (FloodWaitException $e) {
+                /** @var CacheResult<T>|null $stale */
+                $stale = $canUseStale === null || $canUseStale() ? $this->staleResult($key) : null;
+                return $stale ?? throw $e;
+            }
+        });
     }
 
     public function put(string $key, mixed $value, float $loadedAt, string $source): void

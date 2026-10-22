@@ -25,6 +25,7 @@ use Symfony\Bridge\PhpUnit\ClockMock;
 use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;
+use TelegramRSS\Cache\CacheContext;
 use TelegramRSS\Cache\TelegramCache;
 use TelegramRSS\Cache\CacheResult;
 use TelegramRSS\Cache\CacheStatus;
@@ -272,12 +273,12 @@ final class TelegramCacheTest extends TestCase
     {
         $cache = new TelegramCache(maxEntries: 2);
         $load = fn (string $value) => fn () => $this->cacheResult($cache, $value);
-        $cache->remember('a', $load('a'));
-        $cache->remember('b', $load('b'));
-        $cache->remember('a', $load('unexpected'));
-        $cache->remember('c', $load('c'));
-        self::assertSame('a', $cache->remember('a', $load('unexpected'))->value);
-        self::assertSame('reloaded', $cache->remember('b', $load('reloaded'))->value);
+        $cache->get('a', $load('a'));
+        $cache->get('b', $load('b'));
+        $cache->get('a', $load('unexpected'));
+        $cache->get('c', $load('c'));
+        self::assertSame('a', $cache->get('a', $load('unexpected'))->value);
+        self::assertSame('reloaded', $cache->get('b', $load('reloaded'))->value);
     }
 
     public function testQuotaIncludesCacheHitsAndRejectedRequestsDoNotExtendIt(): void
@@ -536,7 +537,7 @@ final class TelegramCacheTest extends TestCase
         $client->getHistoryHtml(['peer' => 'test']);
         $clock->time += 60;
         $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_30');
-        self::assertThrows(fn () => $client->getMessage('@TEST', 7), FloodWaitException::class);
+        self::assertSame($api->message(7), $client->getMessage('@TEST', 7));
         $count = count($api->calls);
         foreach ([fn () => $client->getMessage('TEST', 100), fn () => $client->getInfo('test'),
             fn () => $client->getHistoryHtml(['peer' => '@TEST']), fn () => $client->getMedia(['peer' => 'test', 'id' => [7]], [])] as $call) {
@@ -553,6 +554,34 @@ final class TelegramCacheTest extends TestCase
         $clock->time += 25;
         unset($api->handlers['getMessages']);
         self::assertSame(99, $client->getMessage('test', 99)['id']);
+    }
+
+    public function testMessagesUseStaleOnlyOnFloodWaitWithoutExtendingTheirOriginalAge(): void
+    {
+        foreach (['history', 'getMessages'] as $source) {
+            [$clock, , $api, $client] = $this->createClient();
+            if ($source === 'history') {
+                $client->getHistoryHtml(['peer' => 'test']);
+            } else {
+                $client->getMessage('test', 7);
+            }
+            $clock->time = 1060;
+            $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'CHANNEL_PRIVATE');
+            self::assertThrows(fn () => $client->getMessage('test', 7), UnexpectedValueException::class);
+            $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_1000');
+            $count = null;
+            foreach ([1060, 1900] as $time) {
+                $clock->time = $time;
+                $context = new CacheContext(60);
+                self::assertSame($api->message(7), $client->getMessage('@TEST', 7, $context));
+                self::assertSame([CacheStatus::STALE, $source, 1000.0], [$context->status, $context->messageSource, $context->loadedAt]);
+                $count ??= count($api->calls);
+                self::assertSame($count, count($api->calls));
+            }
+            $clock->time = 1901;
+            self::assertThrows(fn () => $client->getMessage('test', 7), FloodWaitException::class);
+            self::assertSame($count, count($api->calls));
+        }
     }
 
     public function testAsyncMediaMetadataAttributesFLOODWAITToTheFeedPeerAndWarmFallbackKeepsItsAge(): void

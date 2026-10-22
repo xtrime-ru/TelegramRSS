@@ -143,7 +143,7 @@ class TgClient
         // Keep cached and bypassed loads separate, even when their API parameters match.
         $key = 'history:' . $data['peer'] . ':' . ($cacheable ? 'window:' : 'bypass:')
             . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
-        return $this->cache->remember(
+        return $this->cache->get(
             $key,
             /** @return CacheResult<History> */
             function () use ($data, $cacheable): CacheResult {
@@ -180,7 +180,7 @@ class TgClient
     public function getMessage(string $peer, int $id, ?CacheContext $context = null): array
     {
         $peer = TelegramCache::normalizeChannel($peer);
-        $result = $this->cache->remember(
+        $result = $this->cache->getWithStale(
             TelegramCache::messageKey($peer, $id),
             /** @return CacheResult<Message> */
             function () use ($peer, $id): CacheResult {
@@ -258,7 +258,7 @@ class TgClient
             return self::getArrayContents($this->get('getInfo', $requestPeer, $peer));
         }
         $peer = TelegramCache::normalizeChannel($peer);
-        $result = $this->cache->remember('info:' . $peer,
+        $result = $this->cache->get('info:' . $peer,
             fn () => new CacheResult(self::getArrayContents($this->get('getInfo', $requestPeer, $peer)),
                 $this->cache->now(), 'api', CacheStatus::MISS));
         $context?->observe($result);
