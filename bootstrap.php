@@ -8,11 +8,14 @@ if (!class_exists('TelegramRSS')) {
         $root = __DIR__ . '/../../..';
     }
     if (!file_exists($root . '/vendor/autoload.php')) {
-        system('composer install -o --no-dev');
         $root = __DIR__;
     }
-    require_once $root . '/vendor/autoload.php';
     chdir($root);
+    system('composer install -o --no-dev', $exitCode);
+    if ($exitCode !== 0) {
+        throw new \RuntimeException('Composer install failed with exit code ' . $exitCode);
+    }
+    require_once $root . '/vendor/autoload.php';
 }
 
 define('ROOT_DIR', $root);
