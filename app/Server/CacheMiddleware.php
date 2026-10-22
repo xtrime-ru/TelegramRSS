@@ -63,6 +63,13 @@ final class CacheMiddleware implements Middleware
             }
         });
         $context->observe($result);
-        return new Response($result->value['status'], $result->value['headers'], $result->value['body']);
+        $response = new Response($result->value['status'], $result->value['headers'], $result->value['body']);
+        $status = match ($result->status) {
+            CacheStatus::HIT, CacheStatus::STALE => 'hit; ttl=' . (int) floor($cache->ttlSeconds - ($cache->now() - $result->loadedAt)),
+            CacheStatus::MISS, CacheStatus::COALESCED => 'fwd=miss',
+            CacheStatus::BYPASS => 'fwd=bypass',
+        };
+        $response->setHeader('Cache-Status', 'TelegramRSS; ' . $status);
+        return $response;
     }
 }

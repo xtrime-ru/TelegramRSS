@@ -62,7 +62,10 @@ final class TelegramCacheTest extends TestCase
         $count = count($api->calls);
         $again = $this->handle($client, $this->request(channel: 'test', query: '?_cb=42&limit=10', ip: '192.0.2.2'));
         self::assertSame($body, buffer($again->getBody()));
-        self::assertSame($json->getHeaders(), $again->getHeaders());
+        self::assertSame('TelegramRSS; fwd=miss', $json->getHeader('Cache-Status'));
+        self::assertSame('TelegramRSS; hit; ttl=1', $again->getHeader('Cache-Status'));
+        self::assertSame(array_diff_key($json->getHeaders(), ['cache-status' => true]),
+            array_diff_key($again->getHeaders(), ['cache-status' => true]));
         self::assertSame($count, count($api->calls));
         $rss = $this->handle($client, $this->request('rss'), 'rss');
         self::assertStringContainsString('Version 1', buffer($rss->getBody()));
@@ -85,6 +88,7 @@ final class TelegramCacheTest extends TestCase
         $response = $this->handle($client, $preview, 'media');
         self::assertSame([206, 'bytes 0-2/10', 'abc'], [$original->getStatus(), $original->getHeader('content-range'), buffer($original->getBody())]);
         self::assertSame('xyz', buffer($response->getBody()));
+        self::assertNull($response->getHeader('Cache-Status'));
         self::assertSame(0, $api->count('getMessages'));
         $calls = array_values(array_filter($api->calls, fn ($c) => str_starts_with($c['method'], 'getMedia')));
         self::assertSame([['bytes=0-2'], ['bytes=3-5']], array_column(array_column($calls, 'headers'), 'range'));
@@ -175,7 +179,9 @@ final class TelegramCacheTest extends TestCase
                 $clock->time = $time;
                 $response = $this->handle($client, $this->request($format), $format);
                 self::assertSame($body, buffer($response->getBody()));
-                self::assertSame($first->getHeaders(), $response->getHeaders());
+                self::assertSame('TelegramRSS; hit; ttl=' . (1060 - $time), $response->getHeader('Cache-Status'));
+                self::assertSame(array_diff_key($first->getHeaders(), ['cache-status' => true]),
+                    array_diff_key($response->getHeaders(), ['cache-status' => true]));
                 $count ??= count($api->calls);
                 self::assertSame($count, count($api->calls));
             }
@@ -231,7 +237,7 @@ final class TelegramCacheTest extends TestCase
         self::assertSame(7, $client->getMessage('test', 7)['id']);
         self::assertSame(3, $api->count('getMessages'));
         [, , $api, $client] = $this->createClient(false);
-        $this->handle($client, $this->request());
+        self::assertSame('TelegramRSS; fwd=bypass', $this->handle($client, $this->request())->getHeader('Cache-Status'));
         $api->version = 2;
         self::assertStringContainsString('Version 2', buffer($this->handle($client, $this->request())->getBody()));
         self::assertSame(2, $api->count('getHistoryHtml'));
@@ -369,7 +375,9 @@ final class TelegramCacheTest extends TestCase
         self::assertSame(1, $api->count('getHistoryHtml'));
         $count = count($api->calls);
         $rssAgain = $this->handle($client, $this->request('rss', 'TEST', '?limit=3&_cb=42'), 'rss');
-        self::assertSame($rss->getHeaders(), $rssAgain->getHeaders());
+        self::assertSame('TelegramRSS; hit; ttl=60', $rssAgain->getHeader('Cache-Status'));
+        self::assertSame(array_diff_key($rss->getHeaders(), ['cache-status' => true]),
+            array_diff_key($rssAgain->getHeaders(), ['cache-status' => true]));
         self::assertSame(buffer($rss->getBody()), buffer($rssAgain->getBody()));
         self::assertSame($count, count($api->calls));
         self::assertSame($api->message(703), $client->getMessage('test', 703)); // Position 100, never returned in the small feeds above.
@@ -545,7 +553,9 @@ final class TelegramCacheTest extends TestCase
         $second = $this->handle($client, $this->request('rss'), 'rss');
         self::assertSame(200, $second->getStatus());
         self::assertSame($body, buffer($second->getBody()));
-        self::assertSame($first->getHeaders(), $second->getHeaders());
+        self::assertSame('TelegramRSS; hit; ttl=-1', $second->getHeader('Cache-Status'));
+        self::assertSame(array_diff_key($first->getHeaders(), ['cache-status' => true]),
+            array_diff_key($second->getHeaders(), ['cache-status' => true]));
         self::assertSame(1000, self::assertThrows(fn () => $cache->checkCooldown('@TEST'), FloodWaitException::class)->retryAfter);
         self::assertSame(200, $this->handle($client, $this->request('rss', 'other'), 'rss')->getStatus());
     }

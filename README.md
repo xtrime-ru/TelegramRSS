@@ -154,6 +154,9 @@ all cached records to 2,000 by default. There is no byte
 limit; `CACHE_MAX_BYTES` is no longer used. Active downloads and in-flight loads
 are outside the stored-record limit.
 Access logs include `cache_status`, `message_source` and `cache_ttl`.
+RSS/JSON responses expose the standard `Cache-Status` header: `TelegramRSS; hit; ttl=N`,
+`fwd=miss`, or `fwd=bypass`. A negative remaining TTL
+identifies a stale fallback. Media responses do not report a file cache hit.
 
 Tests require PHP 8.4.1+ and PHPUnit 13. Install development dependencies with
 `composer install`, then run the suite with `composer test` (or `vendor/bin/phpunit`).
