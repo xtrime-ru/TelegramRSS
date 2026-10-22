@@ -148,7 +148,7 @@ class TgClient
             /** @return CacheResult<History> */
             function () use ($data, $cacheable): CacheResult {
                 /** @var History $history */
-                $history = self::getContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data]));
+                $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data]));
                 $loadedAt = $this->cache->now();
                 foreach ($history['messages'] ?? [] as $message) {
                     $this->cache->indexMessage($data['peer'], $message, $loadedAt, 'history');
@@ -184,7 +184,7 @@ class TgClient
             TelegramCache::messageKey($peer, $id),
             /** @return CacheResult<Message> */
             function () use ($peer, $id): CacheResult {
-                $data = self::getContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]]));
+                $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]]));
                 foreach ($data['messages'] ?? [] as $message) {
                     if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
                         /** @var Message $message */
@@ -244,7 +244,7 @@ class TgClient
      */
     public function getMediaInfo(array $message, string $peer): array
     {
-        return self::getContents($this->get('getDownloadInfo', $peer, ['message' => $message]));
+        return self::getArrayContents($this->get('getDownloadInfo', $peer, ['message' => $message]));
     }
 
     /**
@@ -255,11 +255,11 @@ class TgClient
         $requestPeer ??= $peer;
         // Icons and calls outside cached routes keep their existing behaviour.
         if ($context === null) {
-            return self::getContents($this->get('getInfo', $requestPeer, $peer));
+            return self::getArrayContents($this->get('getInfo', $requestPeer, $peer));
         }
         $peer = TelegramCache::normalizeChannel($peer);
         $result = $this->cache->remember('info:' . $peer,
-            fn () => new CacheResult(self::getContents($this->get('getInfo', $requestPeer, $peer)),
+            fn () => new CacheResult(self::getArrayContents($this->get('getInfo', $requestPeer, $peer)),
                 $this->cache->now(), 'api', CacheStatus::MISS));
         $context?->observe($result);
         return $result->value;
@@ -270,15 +270,19 @@ class TgClient
      */
     public function getFullInfo(string $peer): array
     {
-        return self::getContents($this->get('getFullInfo', $peer, $peer));
+        return self::getArrayContents($this->get('getFullInfo', $peer, $peer));
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    public function getPropicInfo(string $peer): array
+    public function getPropicInfo(string $peer): ?array
     {
-        return self::getContents($this->get('getPropicInfo', $peer, $peer));
+        $result = self::getContents($this->get('getPropicInfo', $peer, $peer));
+        if ($result !== null && !is_array($result)) {
+            throw new UnexpectedValueException('Invalid API response: expected avatar or null', HttpStatus::BAD_GATEWAY);
+        }
+        return $result;
     }
 
     /**
@@ -286,7 +290,11 @@ class TgClient
      */
     public function getId($chat, string $peer): string
     {
-        return self::getContents($this->get('getId', $peer, [$chat]));
+        $result = self::getContents($this->get('getId', $peer, [$chat]));
+        if (!is_int($result) && !is_string($result)) {
+            throw new UnexpectedValueException('Invalid API response: expected peer ID', HttpStatus::BAD_GATEWAY);
+        }
+        return (string) $result;
     }
 
     /**
@@ -295,12 +303,12 @@ class TgClient
     public function getSponsoredMessages(string $peer, ?CacheContext $context = null): array
     {
         if ($this->isPremium === null) {
-            $self = self::getContents($this->get('getSelf', $peer));
+            $self = self::getArrayContents($this->get('getSelf', $peer));
             $this->isPremium = $self['premium'] ?? null;
         }
         $messages = [];
         if (!$this->isPremium) {
-            $messages = self::getContents($this->get('getSponsoredMessages', $peer, $peer));
+            $messages = self::getArrayContents($this->get('getSponsoredMessages', $peer, $peer));
             /** @var list<\Amp\Future<void>> $futures */
             $futures = [];
             foreach ($messages as $message) {
@@ -405,15 +413,28 @@ class TgClient
         return $response;
     }
 
-    /**
-     * @return array<array-key, mixed>|string
-     */
-    private static function getContents(Response|ServerResponse $response): array|string
+    private static function getContents(Response|ServerResponse $response): mixed
     {
-        $data = [];
-        if (str_contains((string)$response->getHeader('Content-Type'), 'application/json')) {
-            $data = json_decode($response->getBody()->buffer(), true, 50, JSON_THROW_ON_ERROR);
+        if (!str_contains((string) $response->getHeader('Content-Type'), 'application/json')) {
+            throw new UnexpectedValueException('Invalid API response: expected JSON', HttpStatus::BAD_GATEWAY);
         }
-        return $data['response'] ?? [];
+        $data = json_decode(\Amp\ByteStream\buffer($response->getBody()), true, 50, JSON_THROW_ON_ERROR);
+        if (!is_array($data) || !array_key_exists('response', $data)) {
+            throw new UnexpectedValueException('Invalid API response: missing response field', HttpStatus::BAD_GATEWAY);
+        }
+        if (($data['success'] ?? true) !== true || !empty($data['errors'])) {
+            throw new UnexpectedValueException('Invalid API response: API reported an error', HttpStatus::BAD_GATEWAY);
+        }
+        return $data['response'];
+    }
+
+    /** @return array<array-key, mixed> */
+    private static function getArrayContents(Response|ServerResponse $response): array
+    {
+        $result = self::getContents($response);
+        if (!is_array($result)) {
+            throw new UnexpectedValueException('Invalid API response: expected array', HttpStatus::BAD_GATEWAY);
+        }
+        return $result;
     }
 }
