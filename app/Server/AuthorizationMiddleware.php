@@ -60,6 +60,7 @@ class AuthorizationMiddleware implements Middleware
             }
 
             if ($user->isBanned()) {
+                $retryAfter = $user->getBanRemainingSeconds();
                 throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::TOO_MANY_REQUESTS);
             }
             $user->addRequest();

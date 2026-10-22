@@ -225,6 +225,28 @@ final class TelegramCacheTest extends TestCase
         self::assertSame($count, count($api->calls));
     }
 
+    public function testTemporaryBanReportsRemainingSecondsAndExpiresWithoutApiCallsWhileBanned(): void
+    {
+        ClockMock::withClockMock(1000);
+        [, , $api, $client] = $this->createClient();
+        $user = new User();
+        $user->addBan();
+        $request = function () use ($client, $user): Response {
+            $request = $this->request('media');
+            $request->setAttribute('user', $user);
+            return $this->handle($client, $request, 'media');
+        };
+        foreach ([60, 43] as $remaining) {
+            $response = $request();
+            self::assertSame([429, (string) $remaining], [$response->getStatus(), $response->getHeader('Retry-After')]);
+            ClockMock::sleep(17);
+        }
+        self::assertSame([], $api->calls);
+        ClockMock::sleep(26);
+        $response = $request();
+        self::assertSame([206, null], [$response->getStatus(), $response->getHeader('Retry-After')]);
+    }
+
     public function testMissingMessagesAreRetriedAndDisablingCacheAlwaysLoadsFreshData(): void
     {
         [$clock, , $api, $client] = $this->createClient();

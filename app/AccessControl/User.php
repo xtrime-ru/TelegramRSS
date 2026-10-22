@@ -149,15 +149,13 @@ class User
 
     public function getBanDuration(): ?string
     {
-        if ($this->rpmLimit !== 0) {
-            $timeLeft = $this->banUntilTs - time();
+        $seconds = $this->getBanRemainingSeconds();
+        return $seconds > 0 ? gmdate('H:i:s', $seconds) : null;
+    }
 
-            if ($timeLeft > 0) {
-                return gmdate('H:i:s', $timeLeft);
-            }
-        }
-
-        return null;
+    public function getBanRemainingSeconds(): ?int
+    {
+        return $this->rpmLimit === 0 ? null : max(0, $this->banUntilTs - time());
     }
 
     public function addBan(): void
