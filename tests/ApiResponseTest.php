@@ -35,6 +35,8 @@ final class ApiResponseTest extends TestCase
         $response = (new \TelegramRSS\Controller\IconController($client))->handleRequest($request);
         self::assertSame(404, $response->getStatus());
         self::assertNull($response->getHeader('location'));
+        self::assertSame(['no-store', 'TelegramRSS; fwd=bypass; detail=error'],
+            [$response->getHeader('Cache-Control'), $response->getHeader('Cache-Status')]);
     }
 
     public function testAvatarAndOtherArrayResultsArePreserved(): void

@@ -35,6 +35,8 @@ class ErrorResponse implements ErrorHandler
             ) . "\n"
         );
         $response->setStatus($status, $errors[array_key_last($errors)]);
+        $response->setHeader('Cache-Control', 'no-store');
+        $response->setHeader('Cache-Status', 'TelegramRSS; fwd=bypass; detail=error');
         return $response;
     }
 }

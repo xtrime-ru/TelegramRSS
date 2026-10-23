@@ -41,6 +41,7 @@ class AuthorizationMiddleware implements Middleware
         $host = Server::getClientIp($request);
         $user = null;
         $retryAfter = null;
+        $cacheDetail = 'access-denied';
 
         try {
             if (!$this->isIpAllowed($host)) {
@@ -60,17 +61,20 @@ class AuthorizationMiddleware implements Middleware
             }
 
             if ($user->isBanned()) {
+                $cacheDetail = 'ban';
                 $retryAfter = $user->getBanRemainingSeconds();
                 throw new ClientException($request->getClient(), "Time to unlock access: {$user->getBanDuration()}", HttpStatus::TOO_MANY_REQUESTS);
             }
             $user->addRequest();
             if ($user->isRateLimited()) {
+                $cacheDetail = 'rate-limit';
                 $retryAfter = $user->rateRetryAfter;
                 throw new ClientException($request->getClient(), 'Too many requests', HttpStatus::TOO_MANY_REQUESTS);
             }
         } catch (\Throwable $e) {
             $errors = array_merge($user ? $user->errors : [], [$e->getMessage()]);
             $response = ErrorResponse::customError($e->getCode(), $errors);
+            $response->setHeader('Cache-Status', 'TelegramRSS; fwd=bypass; detail=' . $cacheDetail);
             if ($retryAfter !== null) {
                 $response->setHeader('Retry-After', (string) $retryAfter);
             }
@@ -85,12 +89,18 @@ class AuthorizationMiddleware implements Middleware
             }
             $errors = array_merge($user->errors, [$e->getMessage()]);
             $response = ErrorResponse::customError($e->getCode(), $errors);
+            $cacheDetail = 'error';
             if ($e instanceof FloodWaitException) {
+                $cacheDetail = 'flood-wait';
                 $response->setHeader('Retry-After', (string) $e->retryAfter);
             }
+            $response->setHeader('Cache-Status', 'TelegramRSS; fwd=bypass; detail=' . $cacheDetail);
             return $response;
         }
 
+        if (!$response->hasHeader('Cache-Status')) {
+            $response->setHeader('Cache-Status', 'TelegramRSS; fwd=bypass');
+        }
         return $response;
     }
 

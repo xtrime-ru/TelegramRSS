@@ -84,7 +84,11 @@ FLOOD_WAIT pauses.
 Access logs include `cache_status`, `message_source` and `cache_ttl`.
 RSS/JSON responses expose `Cache-Status`: `hit; ttl=N`, `fwd=miss`, or
 `fwd=bypass`, prefixed with `TelegramRSS;`. A negative TTL indicates stale
-fallback. Media cache status describes message reuse, not cached file bytes.
+fallback. Media access-log cache status describes message reuse, not cached file bytes.
+Media streams report `fwd=bypass; detail=media-stream`. Error responses include
+`Cache-Control: no-store` and `Cache-Status` with a reason: `flood-wait` for an API
+flood wait or a local pause, `rate-limit`, `ban`, `access-denied`,
+or `error`. HTTP 429 includes `Retry-After` when the wait duration is known.
 Successful request logs require `LOGS_LEVEL=1`.
 
 ## Tests

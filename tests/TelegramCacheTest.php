@@ -89,7 +89,7 @@ final class TelegramCacheTest extends TestCase
         $response = $this->handle($client, $preview, 'media');
         self::assertSame([206, 'bytes 0-2/10', 'abc'], [$original->getStatus(), $original->getHeader('content-range'), buffer($original->getBody())]);
         self::assertSame('xyz', buffer($response->getBody()));
-        self::assertNull($response->getHeader('Cache-Status'));
+        self::assertSame('TelegramRSS; fwd=bypass; detail=media-stream', $response->getHeader('Cache-Status'));
         self::assertSame(0, $api->count('getMessages'));
         $calls = array_values(array_filter($api->calls, fn ($c) => str_starts_with($c['method'], 'getMedia')));
         self::assertSame([['bytes=0-2'], ['bytes=3-5']], array_column(array_column($calls, 'headers'), 'range'));
@@ -209,6 +209,7 @@ final class TelegramCacheTest extends TestCase
                 $request->setAttribute('user', new User(0));
                 $response = $this->handle($client, $request, $format);
                 self::assertSame([429, null], [$response->getStatus(), $response->getHeader('Retry-After')]);
+                self::assertSame('TelegramRSS; fwd=bypass; detail=ban', $response->getHeader('Cache-Status'));
                 Config::getInstance()->config['access']['forbidden_referer_regex'] = 'evil';
                 self::assertSame(403, $this->handle($client, $this->request($format, extra: ['referer' => 'https://evil.test']), $format)->getStatus());
                 Config::getInstance()->config['access']['forbidden_referer_regex'] = '';
@@ -240,6 +241,7 @@ final class TelegramCacheTest extends TestCase
         foreach ([60, 43] as $remaining) {
             $response = $request();
             self::assertSame([429, (string) $remaining], [$response->getStatus(), $response->getHeader('Retry-After')]);
+            self::assertSame('TelegramRSS; fwd=bypass; detail=ban', $response->getHeader('Cache-Status'));
             ClockMock::sleep(17);
         }
         self::assertSame([], $api->calls);
@@ -293,6 +295,7 @@ final class TelegramCacheTest extends TestCase
         };
         self::assertSame([200, 200, 429, 429], array_map(fn () => $request()->getStatus(), range(1, 4)));
         self::assertGreaterThan(0, (int) $request()->getHeader('Retry-After'));
+        self::assertSame('TelegramRSS; fwd=bypass; detail=rate-limit', $request()->getHeader('Cache-Status'));
         self::assertSame(1, $api->count('getHistoryHtml'));
         self::assertSame([], $user->errors);
         ClockMock::sleep(121);
@@ -554,6 +557,23 @@ final class TelegramCacheTest extends TestCase
         $clock->time += 25;
         unset($api->handlers['getMessages']);
         self::assertSame(99, $client->getMessage('test', 99)['id']);
+    }
+
+    public function testFloodWaitHeadersIncludeRemainingCooldownWithoutExtraApiCalls(): void
+    {
+        [$clock, , $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_30');
+        $response = $this->handle($client, $this->request());
+        self::assertSame([429, '30', 'no-store', 'TelegramRSS; fwd=bypass; detail=flood-wait'],
+            [$response->getStatus(), $response->getHeader('Retry-After'), $response->getHeader('Cache-Control'), $response->getHeader('Cache-Status')]);
+        $count = count($api->calls);
+        $clock->time += 5;
+        foreach (['json', 'media'] as $format) {
+            $response = $this->handle($client, $this->request($format), $format);
+            self::assertSame([429, '25', 'no-store', 'TelegramRSS; fwd=bypass; detail=flood-wait'],
+                [$response->getStatus(), $response->getHeader('Retry-After'), $response->getHeader('Cache-Control'), $response->getHeader('Cache-Status')]);
+        }
+        self::assertSame($count, count($api->calls));
     }
 
     public function testMessagesUseStaleOnlyOnFloodWaitWithoutExtendingTheirOriginalAge(): void

@@ -36,7 +36,9 @@ final class CacheMiddleware implements Middleware
         if ($this->format === 'media') {
             $cache->checkCooldown($channel);
             $this->validator->validateRemotePeer($request, $context);
-            return $requestHandler->handleRequest($request);
+            $response = $requestHandler->handleRequest($request);
+            $response->setHeader('Cache-Status', 'TelegramRSS; fwd=bypass; detail=media-stream');
+            return $response;
         }
         $params = BaseFeedController::getHistoryParameters($request);
         $context->cacheResponse = $params['id'] === 0 && $this->client->usesHistoryWindow(BaseFeedController::getHistoryQuery($params));
