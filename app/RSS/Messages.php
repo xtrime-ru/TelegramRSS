@@ -163,9 +163,12 @@ class Messages
      */
     private function setTitle(array $parsedMessage, array $message): array
     {
-        $descriptionText = strip_tags($parsedMessage['description']);
+        $descriptionText = trim(strip_tags(preg_replace('/<br\b[^>]*>/i', "\n", $parsedMessage['description'])));
+        $lines = preg_split('/\R/u', $descriptionText, 2);
 
-        if (mb_strlen($descriptionText) > 50) {
+        if (count($lines) > 1) {
+            $parsedMessage['title'] = trim($lines[0]);
+        } elseif (mb_strlen($descriptionText) > 50) {
             //Get first sentence from decription
             preg_match('/(?<sentence>.*?\b\W*[.?!;\n])(\W|$)/ui', $descriptionText, $matches);
 
