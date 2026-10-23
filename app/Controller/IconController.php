@@ -28,6 +28,6 @@ class IconController implements RequestHandler
 
         $response = $this->client->downloadToResponse($propicInfo, $request->getHeaders(), $request->getAttribute('channel'));
 
-        return new Response($response->getStatus(), $response->getHeaders(), $response->getBody());
+        return new Response($response->getStatus(), ['x-accel-buffering' => ['no']] + $response->getHeaders(), $response->getBody());
     }
 }

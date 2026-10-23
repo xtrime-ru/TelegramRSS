@@ -27,7 +27,7 @@ class MediaController implements RequestHandler
             CacheContext::fromRequest($request),
         );
 
-        return new Response($response->getStatus(), $response->getHeaders(), $response->getBody());
+        return new Response($response->getStatus(), ['x-accel-buffering' => ['no']] + $response->getHeaders(), $response->getBody());
     }
 
     /**
