@@ -25,6 +25,7 @@ class MediaController implements RequestHandler
             $request->getHeaders(),
             $this->getPreview($request),
             CacheContext::fromRequest($request),
+            $request->getCancellation(),
         );
 
         return new Response($response->getStatus(), ['x-accel-buffering' => ['no']] + $response->getHeaders(), $response->getBody());

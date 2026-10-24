@@ -2,7 +2,8 @@
 
 namespace TelegramRSS\Cache;
 
-use Amp\DeferredFuture;
+use Amp\Cancellation;
+use Amp\NullCancellation;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use TelegramRSS\Logger;
 
@@ -17,7 +18,7 @@ final class TelegramCache
 {
     private const FILE = '/cache/telegram-cache.jsonl';
     private readonly ArrayAdapter $entries;
-    /** @var array<string, DeferredFuture<CacheResult<mixed>>> */
+    /** @var array<string, SharedLoad> */
     private array $loading = [];
     /** @var array<string, float> Normalized peer to Unix pause deadline. */
     private array $cooldowns = [];
@@ -143,61 +144,57 @@ final class TelegramCache
 
     /**
      * @template T
-     * @param \Closure(): CacheResult<T> $loader
+     * @param \Closure(Cancellation): CacheResult<T> $loader
      * @return CacheResult<T>
      */
-    public function get(string $key, \Closure $loader, bool $useStale = false): CacheResult
+    public function get(string $key, \Closure $loader, bool $useStale = false, ?Cancellation $cancellation = null): CacheResult
     {
+        $cancellation?->throwIfRequested();
         if (!$this->enabled) {
-            return $loader()->withStatus(CacheStatus::BYPASS);
+            return $loader($cancellation ?? new NullCancellation)->withStatus(CacheStatus::BYPASS);
         }
         /** @var CacheResult<T>|null $cached The key and loader describe the same payload type. */
         $cached = $this->getCached($key, $useStale);
         if ($cached) {
             return $cached;
         }
-        if (isset($this->loading[$key])) {
-            /** @var CacheResult<T> $result */
-            $result = $this->loading[$key]->getFuture()->await();
-            return $result->withStatus(in_array($result->status, [CacheStatus::STALE, CacheStatus::BYPASS], true) ? $result->status : CacheStatus::COALESCED);
-        }
-
-        /** @var DeferredFuture<CacheResult<mixed>> $deferred */
-        $deferred = new DeferredFuture();
-        $this->loading[$key] = $deferred;
-        $deferred->getFuture()->ignore();
-        try {
-            $result = $loader();
+        $coalesced = isset($this->loading[$key]);
+        $load = $this->loading[$key] ??= new SharedLoad(function (Cancellation $shared) use ($key, $loader): CacheResult {
+            $result = $loader($shared);
+            $shared->throwIfRequested();
             if ($result->status !== CacheStatus::BYPASS) {
                 $this->put($key, $result->value, $result->loadedAt, $result->source);
             }
-            $deferred->complete($result);
             return $result;
-        } catch (\Throwable $e) {
-            $deferred->error($e);
-            throw $e;
+        });
+        try {
+            $result = $load->await($cancellation);
         } finally {
-            unset($this->loading[$key]);
+            if ($load->isFinished() && ($this->loading[$key] ?? null) === $load) {
+                unset($this->loading[$key]);
+            }
         }
+        return $coalesced && !in_array($result->status, [CacheStatus::STALE, CacheStatus::BYPASS], true)
+            ? $result->withStatus(CacheStatus::COALESCED) : $result;
     }
 
     /**
      * @template T
-     * @param \Closure(): CacheResult<T> $loader
+     * @param \Closure(Cancellation): CacheResult<T> $loader
      * @param (\Closure(): bool)|null $canUseStale Checked after loading, when response eligibility is known.
      * @return CacheResult<T>
      */
-    public function getWithStale(string $key, \Closure $loader, ?\Closure $canUseStale = null): CacheResult
+    public function getWithStale(string $key, \Closure $loader, ?\Closure $canUseStale = null, ?Cancellation $cancellation = null): CacheResult
     {
-        return $this->get($key, function () use ($key, $loader, $canUseStale): CacheResult {
+        return $this->get($key, function (Cancellation $shared) use ($key, $loader, $canUseStale): CacheResult {
             try {
-                return $loader();
+                return $loader($shared);
             } catch (FloodWaitException $e) {
                 /** @var CacheResult<T>|null $stale */
                 $stale = $canUseStale === null || $canUseStale() ? $this->staleResult($key) : null;
                 return $stale ?? throw $e;
             }
-        });
+        }, cancellation: $cancellation);
     }
 
     public function put(string $key, mixed $value, float $loadedAt, string $source): void

@@ -24,7 +24,7 @@ final class ApiResponseTest extends TestCase
         self::assertNull($client->getPropicInfo('lht_hn'));
 
         $client = Mockery::mock(TgClient::class);
-        $client->shouldReceive('getPropicInfo')->once()->with('lht_hn')->andReturnNull();
+        $client->shouldReceive('getPropicInfo')->once()->andReturnNull();
         $client->shouldNotReceive('downloadToResponse');
         $request = new \Amp\Http\Server\Request(
             Mockery::mock(\Amp\Http\Server\Driver\Client::class),

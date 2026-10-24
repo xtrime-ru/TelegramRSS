@@ -1,0 +1,113 @@
+--- a/src/Request.php
++++ b/src/Request.php
+@@ -3,10 +3,12 @@
+ namespace Amp\Http\Server;
+
+ use Amp\ByteStream\ReadableStream;
++use Amp\Cancellation;
+ use Amp\Http\Cookie\RequestCookie;
+ use Amp\Http\HttpMessage;
+ use Amp\Http\HttpRequest;
+ use Amp\Http\Server\Driver\Client;
++use Amp\NullCancellation;
+ use Psr\Http\Message\UriInterface as PsrUri;
+
+ /**
+@@ -32,6 +34,7 @@
+      * @param array<non-empty-string, string|string[]> $headers An array of strings or an array of string arrays.
+      * @param string $protocol HTTP protocol version (e.g. 1.0, 1.1, or 2.0).
+      * @param Trailers|null $trailers Trailers if request has trailers, or null otherwise.
++     * @param Cancellation $cancellation Cancellation for this request and its response.
+      */
+     public function __construct(
+         private readonly Client $client,
+@@ -40,7 +43,8 @@
+         array $headers = [],
+         ReadableStream|string $body = '',
+         private string $protocol = "1.1",
+-        ?Trailers $trailers = null
++        ?Trailers $trailers = null,
++        private Cancellation $cancellation = new NullCancellation,
+     ) {
+         parent::__construct($method, $uri);
+
+@@ -55,6 +59,20 @@
+         if ($trailers !== null) {
+             $this->setTrailers($trailers);
+         }
++    }
++
++    /** Returns the cancellation assigned by the server or middleware. */
++    public function getCancellation(): Cancellation
++    {
++        return $this->cancellation;
++    }
++
++    /** Returns a copy of this request with the given cancellation. */
++    public function withCancellation(Cancellation $cancellation): self
++    {
++        $request = clone $this;
++        $request->cancellation = $cancellation;
++        return $request;
+     }
+
+     /**
+--- a/src/Driver/Http2Driver.php
++++ b/src/Driver/Http2Driver.php
+@@ -555,11 +555,11 @@
+         // $id is the new stream ID for the pushed response, $streamId is the original request stream ID.
+         $id = $this->localStreamId += 2; // Server initiated stream IDs must be even.
+
+-        $request = new Request($this->client, "GET", $pushUri, $headers, "", "2");
+-
+         // No data will be incoming on this stream.
+         $stream = $this->createStream($id, 0, Http2Stream::RESERVED | Http2Stream::REMOTE_CLOSED);
+
++        $request = new Request($this->client, "GET", $pushUri, $headers, "", "2",
++            cancellation: $stream->deferredCancellation->getCancellation());
+         $this->streamIdMap[$request] = $id;
+
+         $headers = [
+@@ -1102,7 +1102,8 @@
+                 $uri,
+                 $headers,
+                 "",
+-                "2"
++                "2",
++                cancellation: $stream->deferredCancellation->getCancellation(),
+             );
+
+             $this->timeoutTracker->suspend($streamId);
+@@ -1180,7 +1181,8 @@
+             $headers,
+             $body,
+             "2",
+-            $trailers
++            $trailers,
++            cancellation: $stream->deferredCancellation->getCancellation(),
+         );
+
+         $this->streamIdMap[$request] = $streamId;
+--- a/src/Driver/Internal/AbstractHttpDriver.php
++++ b/src/Driver/Internal/AbstractHttpDriver.php
+@@ -2,6 +2,7 @@
+
+ namespace Amp\Http\Server\Driver\Internal;
+
++use Amp\CancelledException;
+ use Amp\Http\Server\ClientException;
+ use Amp\Http\Server\DefaultExceptionHandler;
+ use Amp\Http\Server\Driver\HttpDriver;
+@@ -60,6 +61,12 @@
+         } catch (HttpErrorException $exception) {
+             $response = $this->errorHandler->handleError($exception->getStatus(), $exception->getReason(), $request);
+         } catch (\Throwable $exception) {
++            if ($exception instanceof CancelledException
++                && ($request->getCancellation()->isRequested() || $request->getClient()->isClosed())
++            ) {
++                $this->pendingResponseCount--;
++                return;
++            }
+             /**
+              * This catch is not designed to be a general-purpose exception handler, rather a last-resort to write to
+              * the logger if the application has failed to handle an exception thrown from a {@see RequestHandler}.

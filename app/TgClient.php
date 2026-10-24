@@ -3,6 +3,8 @@
 namespace TelegramRSS;
 
 
+use Amp\Cancellation;
+use Amp\CancelledException;
 use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\HttpClient;
@@ -74,8 +76,9 @@ class TgClient
      * @param HistoryQuery $data
      * @return History
      */
-    public function getHistoryHtml(array $data, ?CacheContext $context = null): array
+    public function getHistoryHtml(array $data, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
     {
+        $cancellation?->throwIfRequested();
         $data = array_merge(
             [
                 'peer' => '',
@@ -92,14 +95,14 @@ class TgClient
         $data['peer'] = TelegramCache::normalizeChannel((string) $data['peer']);
         ksort($data);
         if (!$this->usesHistoryWindow($data) || $context?->cacheResponse === false) {
-            return $this->historyResponse($this->loadHistory($data, false, $context), $context);
+            return $this->historyResponse($this->loadHistory($data, false, $context, cancellation: $cancellation), $context);
         }
 
         $window = $data;
         $window['limit'] = $this->cache->historyWindowSize;
         $window['add_offset'] = 0;
         $window['hash'] = [];
-        $result = $this->loadHistory($window, true, $context);
+        $result = $this->loadHistory($window, true, $context, cancellation: $cancellation);
         $history = $result->value;
         $messages = $history['messages'] ?? [];
         $covered = count($messages) >= $data['add_offset'] + $data['limit'];
@@ -111,7 +114,7 @@ class TgClient
                 // This fresh load already used the exact original query; do not repeat it.
                 return $this->historyResponse($result->withStatus(CacheStatus::BYPASS), $context);
             }
-            return $this->historyResponse($this->loadHistory($data, false, $context), $context);
+            return $this->historyResponse($this->loadHistory($data, false, $context, cancellation: $cancellation), $context);
         }
         $history['messages'] = array_slice($messages, (int) $data['add_offset'], (int) $data['limit']);
         return $this->historyResponse($result, $context, $history);
@@ -135,7 +138,7 @@ class TgClient
      * @param HistoryQuery $data
      * @return CacheResult<History>
      */
-    private function loadHistory(array $data, bool $cacheable, ?CacheContext $context): CacheResult
+    private function loadHistory(array $data, bool $cacheable, ?CacheContext $context, ?Cancellation $cancellation = null): CacheResult
     {
         if (!$cacheable) {
             $context?->bypassResponseCache();
@@ -145,12 +148,13 @@ class TgClient
         return $this->cache->get(
             $key,
             /** @return CacheResult<History> */
-            function () use ($data, $cacheable): CacheResult {
+            function (Cancellation $cancellation) use ($data, $cacheable): CacheResult {
                 /** @var History $history */
-                $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data]));
+                $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data], cancellation: $cancellation), cancellation: $cancellation);
                 $loadedAt = $this->cache->now();
                 return new CacheResult($history, $loadedAt, 'history', $cacheable ? CacheStatus::MISS : CacheStatus::BYPASS);
             },
+            cancellation: $cancellation,
         );
     }
 
@@ -182,8 +186,9 @@ class TgClient
     /**
      * @return Message
      */
-    public function getMessage(string $peer, int $id, ?CacheContext $context = null): array
+    public function getMessage(string $peer, int $id, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
     {
+        $cancellation?->throwIfRequested();
         $peer = TelegramCache::normalizeChannel($peer);
         $key = TelegramCache::messageKey($peer, $id);
         /** @var CacheResult<Message>|null $result */
@@ -202,8 +207,8 @@ class TgClient
         $result ??= $this->cache->get(
             $key,
             /** @return CacheResult<Message> */
-            function () use ($peer, $id): CacheResult {
-                $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]]));
+            function (Cancellation $cancellation) use ($peer, $id): CacheResult {
+                $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]], cancellation: $cancellation), cancellation: $cancellation);
                 foreach ($data['messages'] ?? [] as $message) {
                     if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
                         /** @var Message $message */
@@ -214,6 +219,7 @@ class TgClient
                 throw new UnexpectedValueException('Empty message', 400);
             },
             useStale: true,
+            cancellation: $cancellation,
         );
         if ($context !== null) {
             $context->observe($result);
@@ -226,7 +232,7 @@ class TgClient
      * @param MediaQuery $data
      * @param Headers $headers
      */
-    public function getMedia(array $data, array $headers, bool $preview = false, ?CacheContext $context = null): HttpResponse
+    public function getMedia(array $data, array $headers, bool $preview = false, ?CacheContext $context = null, ?Cancellation $cancellation = null): HttpResponse
     {
         $data = array_merge(
             [
@@ -236,51 +242,52 @@ class TgClient
             $data
         );
         $this->cache->checkCooldown((string) $data['peer']);
-        $data['message'] = $this->getMessage((string) $data['peer'], (int) ((array) $data['id'])[0], $context);
-        return $this->get($preview ? 'getMediaPreview' : 'getMedia', (string) $data['peer'], ['data' => $data], $headers, 'media');
+        $data['message'] = $this->getMessage((string) $data['peer'], (int) ((array) $data['id'])[0], $context, cancellation: $cancellation);
+        return $this->get($preview ? 'getMediaPreview' : 'getMedia', (string) $data['peer'], ['data' => $data], $headers, 'media', cancellation: $cancellation);
     }
 
     /**
      * @param MediaQuery $data
      * @param Headers $headers
      */
-    public function getMediaPreview(array $data, array $headers, ?CacheContext $context = null): HttpResponse
+    public function getMediaPreview(array $data, array $headers, ?CacheContext $context = null, ?Cancellation $cancellation = null): HttpResponse
     {
-        return $this->getMedia($data, $headers, true, $context);
+        return $this->getMedia($data, $headers, true, $context, cancellation: $cancellation);
     }
 
     /**
      * @param array<string, mixed> $messageMedia
      * @param Headers $headers
      */
-    public function downloadToResponse(array $messageMedia, array $headers, string $peer): HttpResponse
+    public function downloadToResponse(array $messageMedia, array $headers, string $peer, ?Cancellation $cancellation = null): HttpResponse
     {
-        return $this->get('downloadToResponse', $peer, ['messageMedia' => $messageMedia], $headers, 'media');
+        return $this->get('downloadToResponse', $peer, ['messageMedia' => $messageMedia], $headers, 'media', cancellation: $cancellation);
     }
 
     /**
      * @param array<string, mixed> $message
      * @return array{size?: int, mime?: string, name?: string, ext?: string, ...}
      */
-    public function getMediaInfo(array $message, string $peer): array
+    public function getMediaInfo(array $message, string $peer, ?Cancellation $cancellation = null): array
     {
-        return self::getArrayContents($this->get('getDownloadInfo', $peer, ['message' => $message]));
+        return self::getArrayContents($this->get('getDownloadInfo', $peer, ['message' => $message], cancellation: $cancellation), cancellation: $cancellation);
     }
 
     /**
      * @return array{type: string, ...}
      */
-    public function getInfo(string $peer, ?string $requestPeer = null, ?CacheContext $context = null): array
+    public function getInfo(string $peer, ?string $requestPeer = null, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
     {
+        $cancellation?->throwIfRequested();
         $requestPeer ??= $peer;
         // Icons and calls outside cached routes keep their existing behaviour.
         if ($context === null) {
-            return self::getArrayContents($this->get('getInfo', $requestPeer, $peer));
+            return self::getArrayContents($this->get('getInfo', $requestPeer, $peer, cancellation: $cancellation), cancellation: $cancellation);
         }
         $peer = TelegramCache::normalizeChannel($peer);
         $result = $this->cache->get('info:' . $peer,
-            fn () => new CacheResult(self::getArrayContents($this->get('getInfo', $requestPeer, $peer)),
-                $this->cache->now(), 'api', CacheStatus::MISS));
+            fn (Cancellation $cancellation) => new CacheResult(self::getArrayContents($this->get('getInfo', $requestPeer, $peer, cancellation: $cancellation), cancellation: $cancellation),
+                $this->cache->now(), 'api', CacheStatus::MISS), cancellation: $cancellation);
         $context?->observe($result);
         return $result->value;
     }
@@ -288,17 +295,17 @@ class TgClient
     /**
      * @return array{Chat?: array{title?: string, ...}, full?: array{about?: string, ...}, ...}
      */
-    public function getFullInfo(string $peer): array
+    public function getFullInfo(string $peer, ?Cancellation $cancellation = null): array
     {
-        return self::getArrayContents($this->get('getFullInfo', $peer, $peer));
+        return self::getArrayContents($this->get('getFullInfo', $peer, $peer, cancellation: $cancellation), cancellation: $cancellation);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function getPropicInfo(string $peer): ?array
+    public function getPropicInfo(string $peer, ?Cancellation $cancellation = null): ?array
     {
-        $result = self::getContents($this->get('getPropicInfo', $peer, $peer));
+        $result = self::getContents($this->get('getPropicInfo', $peer, $peer, cancellation: $cancellation), cancellation: $cancellation);
         if ($result !== null && !is_array($result)) {
             throw new UnexpectedValueException('Invalid API response: expected avatar or null', HttpStatus::BAD_GATEWAY);
         }
@@ -308,9 +315,9 @@ class TgClient
     /**
      * @param int|string|array<string, mixed> $chat
      */
-    public function getId($chat, string $peer): string
+    public function getId($chat, string $peer, ?Cancellation $cancellation = null): string
     {
-        $result = self::getContents($this->get('getId', $peer, [$chat]));
+        $result = self::getContents($this->get('getId', $peer, [$chat], cancellation: $cancellation), cancellation: $cancellation);
         if (!is_int($result) && !is_string($result)) {
             throw new UnexpectedValueException('Invalid API response: expected peer ID', HttpStatus::BAD_GATEWAY);
         }
@@ -320,26 +327,28 @@ class TgClient
     /**
      * @return list<array<string, mixed>>
      */
-    public function getSponsoredMessages(string $peer, ?CacheContext $context = null): array
+    public function getSponsoredMessages(string $peer, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
     {
+        $cancellation?->throwIfRequested();
         if ($this->isPremium === null) {
-            $self = self::getArrayContents($this->get('getSelf', $peer));
+            $self = self::getArrayContents($this->get('getSelf', $peer, cancellation: $cancellation), cancellation: $cancellation);
             $this->isPremium = $self['premium'] ?? null;
         }
         $messages = [];
         if (!$this->isPremium) {
-            $messages = self::getArrayContents($this->get('getSponsoredMessages', $peer, $peer));
+            $messages = self::getArrayContents($this->get('getSponsoredMessages', $peer, $peer, cancellation: $cancellation), cancellation: $cancellation);
             /** @var list<\Amp\Future<void>> $futures */
             $futures = [];
             foreach ($messages as $message) {
                 if (!empty($message['from_id'])) {
-                    $futures[] = async(function() use(&$message, $peer, $context) {
-                        $id = $this->getId($message['from_id'], $peer);
-                        $message['peer'] = $this->getInfo($id, $peer, $context);
+                    $futures[] = async(function() use(&$message, $peer, $context, $cancellation) {
+                        $id = $this->getId($message['from_id'], $peer, cancellation: $cancellation);
+                        $message['peer'] = $this->getInfo($id, $peer, $context, cancellation: $cancellation);
                     });
                 }
             }
-            awaitAll($futures);
+            awaitAll($futures, $cancellation);
+            $cancellation?->throwIfRequested();
         }
         return $messages;
     }
@@ -348,9 +357,9 @@ class TgClient
      * @param array<string, mixed> $message
      * @return Response|ServerResponse
      */
-    public function viewSponsoredMessage(string $peer, array $message)
+    public function viewSponsoredMessage(string $peer, array $message, ?Cancellation $cancellation = null)
     {
-        return $this->get('viewSponsoredMessage', $peer, ['peer' => $peer, 'message' => $message]);
+        return $this->get('viewSponsoredMessage', $peer, ['peer' => $peer, 'message' => $message], cancellation: $cancellation);
     }
 
     /**
@@ -366,7 +375,9 @@ class TgClient
         array $headers = [],
         string $responseType = 'json',
         int $retry = 0,
+        ?Cancellation $cancellation = null,
     ): Response|ServerResponse {
+        $cancellation?->throwIfRequested();
         $this->cache->checkCooldown($peer);
         unset(
             $headers['host'],
@@ -384,7 +395,7 @@ class TgClient
             //Делаем попытку реконекта
             echo 'Client crashed and restarting. Resending request.' . PHP_EOL;
             Logger::getInstance()->warning('Client crashed and restarting. Resending request.');
-            delay(self::RETRY_INTERVAL);
+            delay(self::RETRY_INTERVAL, cancellation: $cancellation);
         }
 
         $request = new Request(
@@ -400,23 +411,25 @@ class TgClient
         $request->setTlsHandshakeTimeout(0.1);
         $this->cache->checkCooldown($peer);
         try {
-            $response = $this->client->request($request);
+            $response = $this->client->request($request, $cancellation);
+        } catch (CancelledException $e) {
+            throw $e;
         } catch (\Throwable $e) {
-            return $this->get($method, $peer, $parameters, $headers, $responseType, ++$retry);
+            return $this->get($method, $peer, $parameters, $headers, $responseType, ++$retry, cancellation: $cancellation);
         }
 
         if (!in_array($response->getStatus(), [200, 206, 302], true)) {
             $errorMessage = '';
             $errorCode = 400;
             if (str_contains((string)$response->getHeader('Content-Type'), 'application/json')) {
-                $data = json_decode($response->getBody()->buffer(), true);
+                $data = json_decode($response->getBody()->buffer($cancellation), true);
                 $errorMessage = $data['errors'][0]['message'] ?? $errorMessage;
                 $errorCode = $data['errors'][0]['code'] ?? $errorCode;
             }
 
 
             if (!$errorMessage) {
-                return $this->get($method, $peer, $parameters, $headers, $responseType, ++$retry);
+                return $this->get($method, $peer, $parameters, $headers, $responseType, ++$retry, cancellation: $cancellation);
             }
             if ($errorMessage) {
                 if ($errorMessage === 'Message has no preview' || $errorMessage === 'Empty preview') {
@@ -433,12 +446,12 @@ class TgClient
         return $response;
     }
 
-    private static function getContents(Response|ServerResponse $response): mixed
+    private static function getContents(Response|ServerResponse $response, ?Cancellation $cancellation = null): mixed
     {
         if (!str_contains((string) $response->getHeader('Content-Type'), 'application/json')) {
             throw new UnexpectedValueException('Invalid API response: expected JSON', HttpStatus::BAD_GATEWAY);
         }
-        $data = json_decode(\Amp\ByteStream\buffer($response->getBody()), true, 50, JSON_THROW_ON_ERROR);
+        $data = json_decode(\Amp\ByteStream\buffer($response->getBody(), $cancellation), true, 50, JSON_THROW_ON_ERROR);
         if (!is_array($data) || !array_key_exists('response', $data)) {
             throw new UnexpectedValueException('Invalid API response: missing response field', HttpStatus::BAD_GATEWAY);
         }
@@ -449,9 +462,9 @@ class TgClient
     }
 
     /** @return array<array-key, mixed> */
-    private static function getArrayContents(Response|ServerResponse $response): array
+    private static function getArrayContents(Response|ServerResponse $response, ?Cancellation $cancellation = null): array
     {
-        $result = self::getContents($response);
+        $result = self::getContents($response, cancellation: $cancellation);
         if (!is_array($result)) {
             throw new UnexpectedValueException('Invalid API response: expected array', HttpStatus::BAD_GATEWAY);
         }

@@ -14,12 +14,14 @@ class RSSController extends BaseFeedController
     {
         /** @var string $channel */
         $channel = $request->getAttribute('channel');
+        $cancellation = $request->getCancellation();
         $messages = new Messages(
             $this->getMessages($request),
             $this->client,
-            $channel
+            $channel,
+            $cancellation,
         );
-        $feed = new Feed($messages->get(), $channel, $this->client->getFullInfo($channel));
+        $feed = new Feed($messages->get(), $channel, $this->client->getFullInfo($channel, $cancellation));
         return new Response(200, [
             'Content-Type' => 'text/xml;charset=UTF-8',
             'ETag' => sprintf('"%s"', $feed->hash),

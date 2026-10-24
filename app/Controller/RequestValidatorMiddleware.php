@@ -2,6 +2,7 @@
 
 namespace TelegramRSS\Controller;
 
+use Amp\CancelledException;
 use Amp\Http\Server\ClientException;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Request;
@@ -33,6 +34,8 @@ class RequestValidatorMiddleware implements Middleware
                 $this->validateRemotePeer($request);
             }
             return $requestHandler->handleRequest($request);
+        } catch (CancelledException $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
             ForbiddenPeers::add($channel, $exception->getMessage());
             throw $exception;
@@ -79,7 +82,7 @@ class RequestValidatorMiddleware implements Middleware
         $client = $request->getClient();
         /** @var string $channel */
         $channel = $request->getAttribute('channel');
-        $info = $this->tgClient->getInfo($channel, context: $context);
+        $info = $this->tgClient->getInfo($channel, context: $context, cancellation: $request->getCancellation());
         $isChannel = in_array($info['type'], ['channel', 'supergroup']);
         if (
             Config::getInstance()->get('access.only_public_channels') &&

@@ -1,0 +1,17 @@
+{
+    "_hash": "eb0a282d41c8944151503af305cde445b0a9717b0f1ae37d984388c0c21040fc",
+    "patches": {
+        "amphp/http-server": [
+            {
+                "package": "amphp/http-server",
+                "description": "Expose request cancellation through getCancellation()",
+                "url": "patches/http-server-request-cancellation.patch",
+                "sha256": "9e59a6449b0e53fd57ac127533e16b0b2607dc99e0d5b84145187f2c5a7d8143",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

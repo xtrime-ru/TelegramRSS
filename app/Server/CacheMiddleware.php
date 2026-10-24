@@ -2,6 +2,7 @@
 
 namespace TelegramRSS\Server;
 
+use Amp\Cancellation;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
@@ -28,6 +29,7 @@ final class CacheMiddleware implements Middleware
 
     public function handleRequest(Request $request, RequestHandler $requestHandler): Response
     {
+        $cancellation = $request->getCancellation();
         $cache = $this->client->getCache();
         $channel = TelegramCache::normalizeChannel($request->getAttribute('channel'));
         $context = new CacheContext($cache->enabled ? $cache->ttlSeconds : 0);
@@ -44,7 +46,8 @@ final class CacheMiddleware implements Middleware
         $context->cacheResponse = $params['id'] === 0 && $this->client->usesHistoryWindow(BaseFeedController::getHistoryQuery($params));
         $key = 'response:' . $channel . ':' . $this->format . ':' . hash('sha256', json_encode($params, JSON_THROW_ON_ERROR));
         /** @var CacheResult<array{status: int, headers: array<string, list<string>>, body: string}> $result */
-        $result = $cache->getWithStale($key, function () use ($request, $requestHandler, $context, $cache, $channel): CacheResult {
+        $result = $cache->getWithStale($key, function (Cancellation $shared) use ($request, $requestHandler, $context, $cache, $channel): CacheResult {
+            $request = $request->withCancellation($shared);
             $cache->checkCooldown($channel);
             $this->validator->validateRemotePeer($request, $context);
             $response = $requestHandler->handleRequest($request);
@@ -54,10 +57,10 @@ final class CacheMiddleware implements Middleware
             $value = [
                 'status' => $response->getStatus(),
                 'headers' => $response->getHeaders(),
-                'body' => buffer($response->getBody()),
+                'body' => buffer($response->getBody(), $shared),
             ];
             return new CacheResult($value, $context->loadedAt ?? $cache->now(), 'response', $context->cacheResponse ? CacheStatus::MISS : CacheStatus::BYPASS);
-        }, fn (): bool => $context->cacheResponse);
+        }, fn (): bool => $context->cacheResponse, cancellation: $cancellation);
         $context->observe($result);
         $response = new Response($result->value['status'], $result->value['headers'], $result->value['body']);
         $status = match ($result->status) {

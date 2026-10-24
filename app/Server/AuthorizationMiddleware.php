@@ -2,6 +2,7 @@
 
 namespace TelegramRSS\Server;
 
+use Amp\CancelledException;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\ClientException;
 use Amp\Http\Server\Middleware;
@@ -83,6 +84,8 @@ class AuthorizationMiddleware implements Middleware
 
         try {
             $response = $requestHandler->handleRequest($request);
+        } catch (CancelledException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             if (!self::isErrorAllowed($e->getMessage()) && $user !== null) {
                 $user->addError($e->getMessage(), (string)$request->getUri());

@@ -33,12 +33,12 @@ final class Server
             logger: Logger::getInstance(),
             serverSocketFactory: new ConnectionLimitingServerSocketFactory(new LocalSemaphore(1000)),
             clientFactory: new SocketClientFactory(Logger::getInstance()),
-            httpDriverFactory: new DefaultHttpDriverFactory(
+            httpDriverFactory: new ReadAheadHttpDriverFactory(new DefaultHttpDriverFactory(
                 logger: Logger::getInstance(),
                 streamTimeout: 30,
                 connectionTimeout: 5,
                 bodySizeLimit: 5 * (1024 ** 3) // 5G
-            )
+            ))
         );
 
         $server->expose(

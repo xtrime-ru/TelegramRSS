@@ -2,6 +2,7 @@
 
 namespace TelegramRSS\Server;
 
+use Amp\CancelledException;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
@@ -50,6 +51,13 @@ class AccessLoggerMiddleware implements Middleware
 
         try {
             $response = $requestHandler->handleRequest($request);
+        } catch (CancelledException $exception) {
+            $this->logger->log(
+                LogLevel::NOTICE,
+                \sprintf('"%s %s" 499 "Client Closed Request" HTTP/%s %s', $method, $uri, $protocolVersion, $remote),
+                ['request' => $context, 'response' => ['status' => 499, 'reason' => 'Client Closed Request']],
+            );
+            throw $exception;
         } catch (\Throwable $exception) {
             $this->logger->warning(
                 \sprintf(

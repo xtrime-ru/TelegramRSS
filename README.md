@@ -100,6 +100,13 @@ flood wait or a local pause, `rate-limit`, `ban`, `access-denied`,
 or `error`. HTTP 429 includes `Retry-After` when the wait duration is known.
 Successful request logs require `LOGS_LEVEL=1`.
 
+## Dependency patches
+
+Composer applies the local `amphp/http-server` request-cancellation patch.
+`composer install` runs `composer reinstall amphp/http-server` through its
+post-install hook, applying added patches and removing deleted ones even with
+an existing `vendor` directory. Failure stops startup.
+
 ## Tests
 
 Install development dependencies with `composer install`, then run `composer test`.

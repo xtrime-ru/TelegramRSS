@@ -57,14 +57,16 @@ abstract class BaseFeedController implements RequestHandler
         /** @var string $channel */
         $channel = $request->getAttribute('channel');
         $context = CacheContext::fromRequest($request);
-        $isChannel = in_array($this->client->getInfo($channel, context: $context)['type'], ['channel', 'supergroup']);
+        $cancellation = $request->getCancellation();
+        $isChannel = in_array($this->client->getInfo($channel, context: $context, cancellation: $cancellation)['type'], ['channel', 'supergroup']);
 
         $result = $this->client->getHistoryHtml(
             ['peer' => $channel] + self::getHistoryQuery(self::getHistoryParameters($request)),
             $context,
+            $cancellation,
         );
         if ($isChannel) {
-            $result['sponsored_messages'] = $this->client->getSponsoredMessages($channel, $context);
+            $result['sponsored_messages'] = $this->client->getSponsoredMessages($channel, $context, $cancellation);
         }
 
         return $result;

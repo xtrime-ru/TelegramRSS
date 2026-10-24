@@ -3,6 +3,8 @@
 namespace TelegramRSS\RSS;
 
 
+use Amp\Cancellation;
+use Amp\CancelledException;
 use TelegramRSS\Config;
 use TelegramRSS\Logger;
 use TelegramRSS\TgClient;
@@ -36,7 +38,7 @@ class Messages
     /**
      * @param History $telegramResponse
      */
-    public function __construct(array $telegramResponse, TgClient $client, string $peer)
+    public function __construct(array $telegramResponse, TgClient $client, string $peer, private readonly ?Cancellation $cancellation = null)
     {
         $this->telegramResponse = $telegramResponse;
         $this->client = $client;
@@ -57,7 +59,7 @@ class Messages
             foreach ($messages as $message) {
                 $futures[$message['id']] = async($this->getMediaInfo(...), $message);
             }
-            $messagesInfo = await($futures);
+            $messagesInfo = await($futures, $this->cancellation);
 
             foreach ($messages as $key => $message) {
                 if (
@@ -91,8 +93,10 @@ class Messages
                     if (!empty($message['fwd_from']['from_id']) && !empty($message['fwd_from']['channel_post'])) {
                         $info = [];
                         try {
-                            $info = $this->client->getInfo($message['fwd_from']['from_id'], $this->username);
+                            $info = $this->client->getInfo($message['fwd_from']['from_id'], $this->username, cancellation: $this->cancellation);
                             $info = $info[array_key_first($info)] ?? [];
+                        } catch (CancelledException $exception) {
+                            throw $exception;
                         } catch (\Throwable) {
                         }
 
@@ -249,7 +253,7 @@ class Messages
         } else {
             $media = $message['media'];
         }
-        $info = $this->client->getMediaInfo($media, $this->username);
+        $info = $this->client->getMediaInfo($media, $this->username, $this->cancellation);
         if (!empty($info['size']) && !empty($info['mime'])) {
             $info['url'] = $this->getMediaUrl($message, $info, false);
             return $info;

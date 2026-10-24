@@ -18,7 +18,8 @@ class IconController implements RequestHandler
 
     public function handleRequest(Request $request): Response
     {
-        $propicInfo = $this->client->getPropicInfo($request->getAttribute('channel'));
+        $cancellation = $request->getCancellation();
+        $propicInfo = $this->client->getPropicInfo($request->getAttribute('channel'), $cancellation);
         if ($propicInfo === null) {
             return ErrorResponse::customError(HttpStatus::NOT_FOUND, [
                 'code' => HttpStatus::NOT_FOUND,
@@ -26,7 +27,7 @@ class IconController implements RequestHandler
             ]);
         }
 
-        $response = $this->client->downloadToResponse($propicInfo, $request->getHeaders(), $request->getAttribute('channel'));
+        $response = $this->client->downloadToResponse($propicInfo, $request->getHeaders(), $request->getAttribute('channel'), $cancellation);
 
         return new Response($response->getStatus(), ['x-accel-buffering' => ['no']] + $response->getHeaders(), $response->getBody());
     }
