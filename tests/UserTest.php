@@ -81,10 +81,11 @@ final class UserTest extends TestCase
         $access = new AccessControl();
         $feed = $access->getOrCreateUser('reader');
         $this->consume($feed, 3);
-        $feed->addError("first line\nsecond line", '/rss/test');
+        $feed->addError("Первая строка 👋\nвторая строка", '/rss/test');
         $access->getOrCreateUser('reader', 'media')->addBan();
         // Trigger the periodic dump without waiting for the real event-loop timer.
         (new ReflectionMethod(AccessControl::class, 'saveUsers'))->invoke($access);
+        self::assertStringContainsString('Первая строка 👋', file_get_contents(ROOT_DIR . '/cache/users.cache'));
         $unchanged = new AccessControl();
         self::assertSame([false, false, true], $this->consume($unchanged->getOrCreateUser('reader'), 3));
         Config::getInstance()->config['access']['clients_settings'] = ['reader' => ['rpm' => 3, 'media_rpm' => 4]];

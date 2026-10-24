@@ -5,16 +5,14 @@ namespace TelegramRSS\AccessControl;
 use Revolt\EventLoop;
 use TelegramRSS\Config;
 
-use TelegramRSS\Logger;
+use TelegramRSS\Cache\JsonlFileStorage;
 
-use function Amp\ByteStream\splitLines;
-use function Amp\File\deleteFile;
 use function Amp\File\isFile;
-use function Amp\File\move;
-use function Amp\File\openFile;
 
 class AccessControl
 {
+    use JsonlFileStorage;
+
     /** @var array<array-key, User> */
     private array $users = [];
     /** @var array<array-key, User> */
@@ -69,54 +67,28 @@ class AccessControl
         }
     }
 
-    private function saveUsers(): void {
+    private function saveUsers(): void
+    {
         foreach (self::FILES as $path => $object) {
-            $temporary = $path . '.tmp';
-            try {
-                $file = openFile($temporary, 'wb');
-                try {
-                    foreach ($this->{$object} as $key => $user) {
-                        $file->write(json_encode([$key => $user->__serialize()],
-                            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
-                    }
-                } finally {
-                    $file->close();
+            $records = (function () use ($object): \Generator {
+                foreach ($this->{$object} as $key => $user) {
+                    yield [$key => $user->__serialize()];
                 }
-                move($temporary, $path);
-            } catch (\Throwable $exception) {
-                Logger::getInstance()->error('Failed to save user-cache snapshot', [
-                    'path' => $path,
-                    'exception' => $exception,
-                ]);
-            } finally {
-                try {
-                    if (isFile($temporary)) {
-                        deleteFile($temporary);
-                    }
-                } catch (\Throwable $exception) {
-                    Logger::getInstance()->error('Failed to remove temporary user-cache snapshot', [
-                        'path' => $temporary,
-                        'exception' => $exception,
-                    ]);
-                }
-            }
+            })();
+            $this->writeCacheFile($path, $records);
         }
     }
 
-    private function loadUsers(): void {
+    private function loadUsers(): void
+    {
         foreach (self::FILES as $path => $object) {
             if (!isFile($path)) {
                 continue;
             }
-            $file = openFile($path, 'rb');
-            try {
-                foreach (splitLines($file) as $line) {
-                    foreach (self::decodeUserRecord(trim($line)) as $key => $user) {
-                        $this->{$object}[$key] = $this->configuredUser($key, $object === 'mediaUsers', $user);
-                    }
+            foreach ($this->readCacheLines($path) as $line) {
+                foreach (self::decodeUserRecord(trim($line)) as $key => $user) {
+                    $this->{$object}[$key] = $this->configuredUser($key, $object === 'mediaUsers', $user);
                 }
-            } finally {
-                $file->close();
             }
         }
     }

@@ -50,17 +50,18 @@ final class CachePersistenceTest extends TestCase
     public function testRestartPreservesPayloadsValidatorsAndOriginalFreshnessIncludingDowntime(): void
     {
         $cache = $this->cache();
-        $feed = ['body' => "<rss>Привет</rss>\n", 'headers' => ['etag' => ['"original"'], 'last-modified' => ['Thu, 22 Oct 2026 19:11:21 GMT']]];
+        $feed = ['body' => "<rss>Привет 世界 👋</rss>\n", 'headers' => ['etag' => ['"original"'], 'last-modified' => ['Thu, 22 Oct 2026 19:11:21 GMT']]];
         $cache->put('feed', $feed, 1000, 'response');
-        $cache->put('message:test:7', ['id' => 7, 'message' => 'original'], 1000, 'getMessages');
+        $cache->put('message:test:7', ['id' => 7, 'message' => "original \xFF"], 1000, 'getMessages');
         $cache->floodWait('@TEST', 120);
         $this->clock->time = 1010;
         $cache->getCached('feed');
         $cache->save();
+        self::assertStringContainsString('Привет 世界 👋', file_get_contents($this->file));
         $this->clock->time = 1030;
         $restored = $this->cache();
         self::assertSame($feed, $restored->getCached('feed')->value);
-        self::assertSame(['id' => 7, 'message' => 'original'], $restored->getCached('message:test:7')->value);
+        self::assertSame(['id' => 7, 'message' => 'original �'], $restored->getCached('message:test:7')->value);
         try {
             $restored->checkCooldown('test');
             self::fail('Expected persisted cooldown');

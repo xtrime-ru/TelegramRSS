@@ -7,15 +7,13 @@ use Amp\NullCancellation;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use TelegramRSS\Logger;
 
-use function Amp\ByteStream\splitLines;
-use function Amp\File\deleteFile;
 use function Amp\File\isFile;
-use function Amp\File\move;
-use function Amp\File\openFile;
 
 /** Shared by all routes of one TelegramRSS process. Only arrays / scalar data are stored. */
 final class TelegramCache
 {
+    use JsonlFileStorage;
+
     private const FILE = '/cache/telegram-cache.jsonl';
     private readonly ArrayAdapter $channels;
     /** @var array<string, SharedLoad> */
@@ -49,37 +47,16 @@ final class TelegramCache
         if (!$this->enabled) {
             return;
         }
-        $path = ROOT_DIR . self::FILE;
-        $temporary = $path . '.tmp';
-        try {
-            $file = openFile($temporary, 'wb');
-            try {
-                $this->pruneCooldowns();
-                $file->write(json_encode([
-                    'historyWindowSize' => $this->historyWindowSize,
-                    'unit' => 'channel',
-                    'cooldowns' => $this->cooldowns,
-                ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
-                foreach ($this->channels->getItems(array_keys($this->channels->getValues(true))) as $key => $item) {
-                    if ($item->isHit()) {
-                        $file->write(json_encode([$key, $item->get()], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
-                    }
+        $records = (function (): \Generator {
+            $this->pruneCooldowns();
+            yield ['historyWindowSize' => $this->historyWindowSize, 'unit' => 'channel', 'cooldowns' => $this->cooldowns];
+            foreach ($this->channels->getItems(array_keys($this->channels->getValues(true))) as $key => $item) {
+                if ($item->isHit()) {
+                    yield [$key, $item->get()];
                 }
-            } finally {
-                $file->close();
             }
-            move($temporary, $path);
-        } catch (\Throwable $exception) {
-            Logger::getInstance()->error('Failed to save Telegram cache', ['path' => $path, 'exception' => $exception]);
-        } finally {
-            try {
-                if (isFile($temporary)) {
-                    deleteFile($temporary);
-                }
-            } catch (\Throwable $exception) {
-                Logger::getInstance()->error('Failed to remove temporary Telegram cache', ['path' => $temporary, 'exception' => $exception]);
-            }
-        }
+        })();
+        $this->writeCacheFile(ROOT_DIR . self::FILE, $records);
     }
 
     public function load(): void
@@ -92,48 +69,43 @@ final class TelegramCache
             if (!isFile($path)) {
                 return;
             }
-            $file = openFile($path, 'rb');
-            try {
-                $header = null;
-                $now = $this->now();
-                foreach (splitLines($file) as $line) {
-                    $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                    if ($header === null) {
-                        if (!is_int($record['historyWindowSize'] ?? null) || !is_array($record['cooldowns'] ?? null)) {
-                            throw new \UnexpectedValueException('Invalid Telegram cache snapshot');
-                        }
-                        $header = $record;
-                        $this->cooldowns = array_filter($header['cooldowns'], static fn (float $until): bool => $until > $now);
-                        if ($this->maxChannels === 0 || ($header['unit'] ?? null) !== 'channel' || $header['historyWindowSize'] !== $this->historyWindowSize) {
-                            return;
-                        }
-                        continue;
+            $header = null;
+            $now = $this->now();
+            foreach ($this->readCacheLines($path) as $line) {
+                $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if ($header === null) {
+                    if (!is_int($record['historyWindowSize'] ?? null) || !is_array($record['cooldowns'] ?? null)) {
+                        throw new \UnexpectedValueException('Invalid Telegram cache snapshot');
                     }
-                    if (!is_array($record) || !array_is_list($record) || count($record) !== 2) {
+                    $header = $record;
+                    $this->cooldowns = array_filter($header['cooldowns'], static fn (float $until): bool => $until > $now);
+                    if ($this->maxChannels === 0 || ($header['unit'] ?? null) !== 'channel' || $header['historyWindowSize'] !== $this->historyWindowSize) {
+                        return;
+                    }
+                    continue;
+                }
+                if (!is_array($record) || !array_is_list($record) || count($record) !== 2) {
+                    throw new \UnexpectedValueException('Invalid Telegram cache entry');
+                }
+                [$channel, $values] = $record;
+                if (!is_string($channel) || !is_array($values)) {
+                    throw new \UnexpectedValueException('Invalid Telegram cache channel');
+                }
+                foreach ($values as $key => $entry) {
+                    if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
+                        || !is_numeric($entry[1]) || !is_string($entry[2])) {
                         throw new \UnexpectedValueException('Invalid Telegram cache entry');
                     }
-                    [$channel, $values] = $record;
-                    if (!is_string($channel) || !is_array($values)) {
-                        throw new \UnexpectedValueException('Invalid Telegram cache channel');
-                    }
-                    foreach ($values as $key => $entry) {
-                        if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
-                            || !is_numeric($entry[1]) || !is_string($entry[2])) {
-                            throw new \UnexpectedValueException('Invalid Telegram cache entry');
-                        }
-                        if ($entry[1] > $now || $now - $entry[1] > max($this->ttlSeconds, $this->staleTtlSeconds)) {
-                            unset($values[$key]);
-                        }
-                    }
-                    if ($values) {
-                        $this->channels->save($this->channels->getItem($channel)->set($values));
+                    if ($entry[1] > $now || $now - $entry[1] > max($this->ttlSeconds, $this->staleTtlSeconds)) {
+                        unset($values[$key]);
                     }
                 }
-                if ($header === null) {
-                    throw new \UnexpectedValueException('Empty Telegram cache snapshot');
+                if ($values) {
+                    $this->channels->save($this->channels->getItem($channel)->set($values));
                 }
-            } finally {
-                $file->close();
+            }
+            if ($header === null) {
+                throw new \UnexpectedValueException('Empty Telegram cache snapshot');
             }
         } catch (\Throwable $exception) {
             Logger::getInstance()->error('Failed to load Telegram cache', ['path' => $path, 'exception' => $exception]);
