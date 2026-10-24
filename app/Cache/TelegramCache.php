@@ -51,14 +51,14 @@ final class TelegramCache
      * @param \Closure(): CacheResult<T> $loader
      * @return CacheResult<T>
      */
-    public function get(string $key, \Closure $loader): CacheResult
+    public function get(string $key, \Closure $loader, bool $useStale = false): CacheResult
     {
         if (!$this->enabled) {
             return $loader()->withStatus(CacheStatus::BYPASS);
         }
         /** @var CacheResult<T>|null $cached The key and loader describe the same payload type. */
-        $cached = $this->raw($key);
-        if ($cached && $this->ttlSeconds > 0 && $this->now() - $cached->loadedAt < $this->ttlSeconds) {
+        $cached = $this->getCached($key, $useStale);
+        if ($cached) {
             return $cached;
         }
         if (isset($this->loading[$key])) {
@@ -114,20 +114,24 @@ final class TelegramCache
         $this->entries->save($item->set([$value, $loadedAt, $source]));
     }
 
-    /**
-     * @param array<string, mixed> $message
-     */
-    public function indexMessage(string $channel, array $message, float $loadedAt, string $source): void
-    {
-        if (!$this->enabled || !in_array($message['_'] ?? '', ['message', 'messageService'], true) || !isset($message['id'])) {
-            return;
-        }
-        $this->put(self::messageKey($channel, (int) $message['id']), $message, $loadedAt, $source);
-    }
-
     public function forgetMessage(string $channel, int $id): void
     {
         $this->entries->deleteItem(hash('sha256', self::messageKey($channel, $id)));
+    }
+
+    /** @return CacheResult<mixed>|null */
+    public function getCached(string $key, bool $useStale = false): ?CacheResult
+    {
+        if (!$this->enabled || !($cached = $this->raw($key))) {
+            return null;
+        }
+        $age = $this->now() - $cached->loadedAt;
+        if ($this->ttlSeconds > 0 && $age < $this->ttlSeconds) {
+            return $cached;
+        }
+        return $useStale && $this->staleTtlSeconds > 0 && $age <= $this->staleTtlSeconds
+            ? $cached->withStatus(CacheStatus::STALE)
+            : null;
     }
 
     /**

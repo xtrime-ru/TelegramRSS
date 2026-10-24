@@ -141,8 +141,7 @@ class TgClient
             $context?->bypassResponseCache();
         }
         // Keep cached and bypassed loads separate, even when their API parameters match.
-        $key = 'history:' . $data['peer'] . ':' . ($cacheable ? 'window:' : 'bypass:')
-            . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
+        $key = self::historyCacheKey($data, $cacheable);
         return $this->cache->get(
             $key,
             /** @return CacheResult<History> */
@@ -150,12 +149,18 @@ class TgClient
                 /** @var History $history */
                 $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data]));
                 $loadedAt = $this->cache->now();
-                foreach ($history['messages'] ?? [] as $message) {
-                    $this->cache->indexMessage($data['peer'], $message, $loadedAt, 'history');
-                }
                 return new CacheResult($history, $loadedAt, 'history', $cacheable ? CacheStatus::MISS : CacheStatus::BYPASS);
             },
         );
+    }
+
+    /** @param HistoryQuery $data */
+    private static function historyCacheKey(array $data, bool $cacheable): string
+    {
+        ksort($data);
+        return 'history:' . $data['peer'] . ':' . ($cacheable
+            ? 'window'
+            : 'bypass:' . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR)));
     }
 
     /**
@@ -180,8 +185,22 @@ class TgClient
     public function getMessage(string $peer, int $id, ?CacheContext $context = null): array
     {
         $peer = TelegramCache::normalizeChannel($peer);
-        $result = $this->cache->getWithStale(
-            TelegramCache::messageKey($peer, $id),
+        $key = TelegramCache::messageKey($peer, $id);
+        /** @var CacheResult<Message>|null $result */
+        $result = $this->cache->getCached($key, useStale: true);
+        /** @var CacheResult<History>|null $history */
+        $history = $this->cache->getCached(self::historyCacheKey(['peer' => $peer], true), useStale: true);
+        if ($history && (!$result || $history->loadedAt > $result->loadedAt)) {
+            foreach ($history->value['messages'] ?? [] as $message) {
+                if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
+                    /** @var Message $message */
+                    $result = new CacheResult($message, $history->loadedAt, 'history', $history->status);
+                    break;
+                }
+            }
+        }
+        $result ??= $this->cache->get(
+            $key,
             /** @return CacheResult<Message> */
             function () use ($peer, $id): CacheResult {
                 $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]]));
@@ -194,6 +213,7 @@ class TgClient
                 $this->cache->forgetMessage($peer, $id);
                 throw new UnexpectedValueException('Empty message', 400);
             },
+            useStale: true,
         );
         if ($context !== null) {
             $context->observe($result);

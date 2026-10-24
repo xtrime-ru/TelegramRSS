@@ -97,7 +97,7 @@ final class TelegramCacheTest extends TestCase
         $repeat = $this->handle($client, $this->request('media', extra: ['range' => 'bytes=0-2']), 'media');
         self::assertSame('abc', buffer($repeat->getBody()));
         self::assertSame(2, $api->count('getMedia'));
-        $clock->time += 60;
+        $clock->time += 901;
         $api->version = 2;
         self::assertSame($api->message(7), $client->getMessage('test', 7));
         self::assertSame(1, $api->count('getMessages'));
@@ -115,7 +115,7 @@ final class TelegramCacheTest extends TestCase
         $client->getHistoryHtml(['peer' => 'test', 'add_offset' => 100]);
         self::assertSame('Version 1', $client->getMessage('test', 7)['message']);
         self::assertSame(2, $api->count('getMessages'));
-        $clock->time += 60;
+        $clock->time += 901;
         $api->version = 2;
         self::assertSame($api->message(7), $client->getMessage('test', 7));
         self::assertSame(3, $api->count('getMessages'));
@@ -254,7 +254,7 @@ final class TelegramCacheTest extends TestCase
     {
         [$clock, , $api, $client] = $this->createClient();
         $client->getHistoryHtml(['peer' => 'test']);
-        $clock->time += 60;
+        $clock->time += 901;
         $api->handlers['getMessages'] = fn ($r) => $api->response($r, ['messages' => [['_' => 'messageEmpty', 'id' => 7]]]);
         self::assertThrows(fn () => $client->getMessage('test', 7), UnexpectedValueException::class);
         self::assertThrows(fn () => $client->getMessage('test', 7), UnexpectedValueException::class);
@@ -541,6 +541,7 @@ final class TelegramCacheTest extends TestCase
         $clock->time += 60;
         $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_30');
         self::assertSame($api->message(7), $client->getMessage('@TEST', 7));
+        self::assertThrows(fn () => $client->getMessage('@TEST', 9), FloodWaitException::class);
         $count = count($api->calls);
         foreach ([fn () => $client->getMessage('TEST', 100), fn () => $client->getInfo('test'),
             fn () => $client->getHistoryHtml(['peer' => '@TEST']), fn () => $client->getMedia(['peer' => 'test', 'id' => [7]], [])] as $call) {
@@ -576,7 +577,7 @@ final class TelegramCacheTest extends TestCase
         self::assertSame($count, count($api->calls));
     }
 
-    public function testMessagesUseStaleOnlyOnFloodWaitWithoutExtendingTheirOriginalAge(): void
+    public function testMediaSearchesStaleMessagesBeforeApiWithoutExtendingTheirOriginalAge(): void
     {
         foreach (['history', 'getMessages'] as $source) {
             [$clock, , $api, $client] = $this->createClient();
@@ -585,23 +586,35 @@ final class TelegramCacheTest extends TestCase
             } else {
                 $client->getMessage('test', 7);
             }
-            $clock->time = 1060;
+            $count = count($api->calls);
             $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'CHANNEL_PRIVATE');
-            self::assertThrows(fn () => $client->getMessage('test', 7), UnexpectedValueException::class);
-            $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_1000');
-            $count = null;
             foreach ([1060, 1900] as $time) {
                 $clock->time = $time;
                 $context = new CacheContext(60);
                 self::assertSame($api->message(7), $client->getMessage('@TEST', 7, $context));
                 self::assertSame([CacheStatus::STALE, $source, 1000.0], [$context->status, $context->messageSource, $context->loadedAt]);
-                $count ??= count($api->calls);
                 self::assertSame($count, count($api->calls));
             }
             $clock->time = 1901;
+            self::assertThrows(fn () => $client->getMessage('test', 7), UnexpectedValueException::class);
+            self::assertSame($count + 1, count($api->calls));
+            $api->handlers['getMessages'] = fn ($r) => $api->error($r, 'FLOOD_WAIT_1000');
             self::assertThrows(fn () => $client->getMessage('test', 7), FloodWaitException::class);
-            self::assertSame($count, count($api->calls));
         }
+    }
+
+    public function testHistoryAndMediaLookupsShareOneCacheEntryPerChannel(): void
+    {
+        [, $cache, $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data']));
+        foreach (['first', 'second', 'third'] as $channel) {
+            $history = $client->getHistoryHtml(['peer' => $channel, 'limit' => 100]);
+            self::assertSame($history['messages'], array_map(
+                fn ($message) => $client->getMessage($channel, $message['id']), $history['messages'],
+            ));
+        }
+        self::assertSame(0, $api->count('getMessages'));
+        self::assertSame(3, $cache->stats()['entries']);
     }
 
     public function testAsyncMediaMetadataAttributesFLOODWAITToTheFeedPeerAndWarmFallbackKeepsItsAge(): void

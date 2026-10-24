@@ -56,7 +56,7 @@ Configure caching in `.env` or `.env.docker` and restart:
 | `CACHE_MAX_ENTRIES` | `2000` | Maximum records; `0` disables storage |
 | `CACHE_TTL_SECONDS` | `60` | Freshness period; `0` disables fresh reuse |
 | `CACHE_HISTORY_WINDOW_SIZE` | `100` | Latest messages shared across feeds; range 1–100 |
-| `CACHE_STALE_TTL_SECONDS` | `900` | Maximum fallback age on FLOOD_WAIT; `0` disables fallback |
+| `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale feeds and media messages; `0` disables stale reuse |
 
 Limits and TTLs must be non-negative. The cache lives in one process and resets
 on restart. Least recently used records are evicted when the entry limit is
@@ -69,14 +69,17 @@ are fetched directly and have no stale feed fallback. Channel names are
 case-insensitive; an initial `@`, client IP and unused parameters such as `_cb`
 do not create separate channel histories.
 
-Media can reuse messages loaded by a feed or a previous media request. Original
-files, previews and Range requests each get their own download stream. File bytes
-and icons are not cached.
+Media first looks for the message in the channel history and previous media
+lookups, including stale data up to `CACHE_STALE_TTL_SECONDS` old. Only a missing
+or expired message requires an API lookup. History messages are not duplicated
+as separate cache entries; standalone media lookups are stored separately.
+Original files, previews and Range requests each get their own download stream.
+File bytes and icons are not cached.
 
 On FLOOD_WAIT, API requests for that channel pause; other channels remain
 available. Cached feeds can still be returned. If refresh is blocked, previously
-loaded feeds and messages may be reused for up to `CACHE_STALE_TTL_SECONDS`
-without extending their original age. Other errors do not enable stale fallback.
+loaded feeds may be reused for up to `CACHE_STALE_TTL_SECONDS` without extending
+their original age. Other errors do not enable stale feed fallback.
 Downloads still return HTTP 429 with `Retry-After` during the pause: a cached
 message cannot replace the file transfer. Disabling caching does not disable
 FLOOD_WAIT pauses.
