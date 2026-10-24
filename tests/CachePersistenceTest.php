@@ -85,13 +85,15 @@ final class CachePersistenceTest extends TestCase
         foreach (['a', 'b', 'c'] as $key) {
             $cache->put($key, $key, 1000, 'history');
         }
+        $cache->put('message:a:7', ['id' => 7], 1000, 'getMessages');
         $cache->getCached('a');
         $cache->save();
-        $restored = $this->cache(maxEntries: 2);
+        $restored = $this->cache(maxChannels: 2);
         self::assertNull($restored->getCached('b'));
         self::assertSame(['c', 'a'], [$restored->getCached('c')->value, $restored->getCached('a')->value]);
-        self::assertSame(0, $this->cache(enabled: false)->stats()['entries']);
-        self::assertSame(0, $this->cache(historyWindowSize: 50)->stats()['entries']);
+        self::assertSame(['id' => 7], $restored->getCached('message:a:7')->value);
+        self::assertSame(0, $this->cache(enabled: false)->stats()['channels']);
+        self::assertSame(0, $this->cache(historyWindowSize: 50)->stats()['channels']);
     }
 
     public function testFailedReplacementKeepsPreviousSnapshotAndRemovesTemporaryFile(): void
@@ -121,7 +123,7 @@ final class CachePersistenceTest extends TestCase
         $logger = Mockery::mock(Logger::class);
         $logger->shouldReceive('error')->once();
         (new ReflectionProperty(Logger::class, 'instanse'))->setValue(null, $logger);
-        self::assertSame(0, $this->cache()->stats()['entries']);
+        self::assertSame(0, $this->cache()->stats()['channels']);
     }
 
     public function testDisabledCacheDoesNotReadOrWriteSnapshot(): void
@@ -134,9 +136,9 @@ final class CachePersistenceTest extends TestCase
         self::assertSame('untouched', file_get_contents($this->file));
     }
 
-    private function cache(int $maxEntries = 2000, bool $enabled = true, int $historyWindowSize = 100): TelegramCache
+    private function cache(int $maxChannels = 500, bool $enabled = true, int $historyWindowSize = 100): TelegramCache
     {
-        $cache = new TelegramCache($enabled, $maxEntries, fn () => $this->clock->time,
+        $cache = new TelegramCache($enabled, $maxChannels, fn () => $this->clock->time,
             historyWindowSize: $historyWindowSize);
         $cache->load();
         return $cache;

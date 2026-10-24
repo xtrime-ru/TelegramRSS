@@ -53,9 +53,9 @@ Configure caching in `.env` or `.env.docker` and restart:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CACHE_ENABLED` | `1` | Enable caching; `0` disables it |
-| `CACHE_MAX_ENTRIES` | `2000` | Maximum records; `0` disables storage |
+| `CACHE_MAX_CHANNELS` | `500` | Maximum channels; `0` disables storage |
 | `CACHE_TTL_SECONDS` | `60` | Freshness period; `0` disables fresh reuse |
-| `CACHE_HISTORY_WINDOW_SIZE` | `100` | Latest messages shared across feeds; range 1–100 |
+| `CACHE_HISTORY_WINDOW_SIZE` | `10` | Latest messages shared across feeds; range 1–100 |
 | `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale feeds and media messages; `0` disables stale reuse |
 
 Limits and TTLs must be non-negative. Each process has its own cache. A JSONL
@@ -65,9 +65,10 @@ Expired records are skipped; changed limits apply on restore. Changing the histo
 window discards saved results. Snapshot errors are logged without preventing
 startup; failed saves preserve the previous file. Forced termination (SIGKILL)
 cannot save a new snapshot. `CACHE_ENABLED=0` disables snapshot reads and writes.
-Least recently used records are evicted when the entry limit is
-reached. Messages, histories and ready feeds all count toward this limit;
-there is no byte limit.
+Least recently used channels are evicted as a whole, including their history,
+messages, metadata and ready feeds. `CACHE_MAX_CHANNELS` replaces
+`CACHE_MAX_ENTRIES`; there is no byte limit. Old snapshots are discarded when
+the storage format or history window changes.
 
 RSS and JSON, different limits and pages reuse the latest messages of a channel.
 Requests outside this window, with `id`, or not covered by the available history

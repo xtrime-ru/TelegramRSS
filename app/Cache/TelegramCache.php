@@ -17,7 +17,7 @@ use function Amp\File\openFile;
 final class TelegramCache
 {
     private const FILE = '/cache/telegram-cache.jsonl';
-    private readonly ArrayAdapter $entries;
+    private readonly ArrayAdapter $channels;
     /** @var array<string, SharedLoad> */
     private array $loading = [];
     /** @var array<string, float> Normalized peer to Unix pause deadline. */
@@ -30,18 +30,18 @@ final class TelegramCache
      */
     public function __construct(
         public readonly bool $enabled = true,
-        private readonly int $maxEntries = 2000,
+        private readonly int $maxChannels = 500,
         ?\Closure $clock = null,
         public readonly int $ttlSeconds = 60,
         private readonly int $staleTtlSeconds = 900,
-        public readonly int $historyWindowSize = 100,
+        public readonly int $historyWindowSize = 10,
     ) {
-        if ($maxEntries < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0 || $historyWindowSize < 1 || $historyWindowSize > 100) {
+        if ($maxChannels < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0 || $historyWindowSize < 1 || $historyWindowSize > 100) {
             throw new \InvalidArgumentException('Cache limits and TTLs must be non-negative; history window must be within 1-100');
         }
         $this->clock = $clock ?? static fn (): float => microtime(true);
-        // ArrayAdapter treats zero as unlimited; writes are disabled separately for maxEntries=0.
-        $this->entries = new ArrayAdapter(0, true, 0, max(1, $maxEntries));
+        // ArrayAdapter treats zero as unlimited; writes are disabled separately for maxChannels=0.
+        $this->channels = new ArrayAdapter(0, true, 0, max(1, $maxChannels));
     }
 
     public function save(): void
@@ -57,9 +57,10 @@ final class TelegramCache
                 $this->pruneCooldowns();
                 $file->write(json_encode([
                     'historyWindowSize' => $this->historyWindowSize,
+                    'unit' => 'channel',
                     'cooldowns' => $this->cooldowns,
                 ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
-                foreach ($this->entries->getItems(array_keys($this->entries->getValues(true))) as $key => $item) {
+                foreach ($this->channels->getItems(array_keys($this->channels->getValues(true))) as $key => $item) {
                     if ($item->isHit()) {
                         $file->write(json_encode([$key, $item->get()], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
                     }
@@ -103,21 +104,29 @@ final class TelegramCache
                         }
                         $header = $record;
                         $this->cooldowns = array_filter($header['cooldowns'], static fn (float $until): bool => $until > $now);
-                        continue;
-                    }
-                    if ($this->maxEntries === 0 || $header['historyWindowSize'] !== $this->historyWindowSize) {
+                        if ($this->maxChannels === 0 || ($header['unit'] ?? null) !== 'channel' || $header['historyWindowSize'] !== $this->historyWindowSize) {
+                            return;
+                        }
                         continue;
                     }
                     if (!is_array($record) || !array_is_list($record) || count($record) !== 2) {
                         throw new \UnexpectedValueException('Invalid Telegram cache entry');
                     }
-                    [$key, $entry] = $record;
-                    if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
-                        || !is_numeric($entry[1]) || !is_string($entry[2])) {
-                        throw new \UnexpectedValueException('Invalid Telegram cache entry');
+                    [$channel, $values] = $record;
+                    if (!is_string($channel) || !is_array($values)) {
+                        throw new \UnexpectedValueException('Invalid Telegram cache channel');
                     }
-                    if ($entry[1] <= $now && $now - $entry[1] <= max($this->ttlSeconds, $this->staleTtlSeconds)) {
-                        $this->entries->save($this->entries->getItem($key)->set($entry));
+                    foreach ($values as $key => $entry) {
+                        if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
+                            || !is_numeric($entry[1]) || !is_string($entry[2])) {
+                            throw new \UnexpectedValueException('Invalid Telegram cache entry');
+                        }
+                        if ($entry[1] > $now || $now - $entry[1] > max($this->ttlSeconds, $this->staleTtlSeconds)) {
+                            unset($values[$key]);
+                        }
+                    }
+                    if ($values) {
+                        $this->channels->save($this->channels->getItem($channel)->set($values));
                     }
                 }
                 if ($header === null) {
@@ -178,71 +187,37 @@ final class TelegramCache
             ? $result->withStatus(CacheStatus::COALESCED) : $result;
     }
 
-    /**
-     * @template T
-     * @param \Closure(Cancellation): CacheResult<T> $loader
-     * @param (\Closure(): bool)|null $canUseStale Checked after loading, when response eligibility is known.
-     * @return CacheResult<T>
-     */
-    public function getWithStale(string $key, \Closure $loader, ?\Closure $canUseStale = null, ?Cancellation $cancellation = null): CacheResult
-    {
-        return $this->get($key, function (Cancellation $shared) use ($key, $loader, $canUseStale): CacheResult {
-            try {
-                return $loader($shared);
-            } catch (FloodWaitException $e) {
-                /** @var CacheResult<T>|null $stale */
-                $stale = $canUseStale === null || $canUseStale() ? $this->staleResult($key) : null;
-                return $stale ?? throw $e;
-            }
-        }, cancellation: $cancellation);
-    }
-
     public function put(string $key, mixed $value, float $loadedAt, string $source): void
     {
-        if (!$this->enabled || $this->maxEntries === 0) {
+        if (!$this->enabled || $this->maxChannels === 0) {
             return;
         }
-        $item = $this->entries->getItem(hash('sha256', $key));
-        $this->entries->save($item->set([$value, $loadedAt, $source]));
-    }
-
-    public function forgetMessage(string $channel, int $id): void
-    {
-        $this->entries->deleteItem(hash('sha256', self::messageKey($channel, $id)));
+        $item = $this->channels->getItem(self::channelKey($key));
+        $now = $this->now();
+        $oldest = $now - max($this->ttlSeconds, $this->staleTtlSeconds);
+        /** @var array<string, array{mixed, float, string}> $values */
+        $values = array_filter($item->get() ?? [], static fn (array $entry): bool => $entry[1] >= $oldest && $entry[1] <= $now);
+        $values[$key] = [$value, $loadedAt, $source];
+        $this->channels->save($item->set($values));
     }
 
     /** @return CacheResult<mixed>|null */
     public function getCached(string $key, bool $useStale = false): ?CacheResult
     {
-        if (!$this->enabled || !($cached = $this->raw($key))) {
+        if (!$this->enabled) {
             return null;
         }
-        $age = $this->now() - $cached->loadedAt;
-        if ($this->ttlSeconds > 0 && $age < $this->ttlSeconds) {
-            return $cached;
-        }
-        return $useStale && $this->staleTtlSeconds > 0 && $age <= $this->staleTtlSeconds
-            ? $cached->withStatus(CacheStatus::STALE)
-            : null;
-    }
-
-    /**
-     * @return CacheResult<mixed>|null
-     */
-    public function staleResult(string $key): ?CacheResult
-    {
-        if (!$this->enabled || $this->staleTtlSeconds === 0) {
+        /** @var array{mixed, float, string}|null $entry */
+        $entry = $this->channels->getItem(self::channelKey($key))->get()[$key] ?? null;
+        if ($entry === null) {
             return null;
         }
-        $cached = $this->raw($key);
-        return $cached && $this->now() - $cached->loadedAt <= $this->staleTtlSeconds
-            ? $cached->withStatus(CacheStatus::STALE)
-            : null;
-    }
-
-    public static function messageKey(string $channel, int $id): string
-    {
-        return 'message:' . self::normalizeChannel($channel) . ':' . $id;
+        $age = $this->now() - $entry[1];
+        $fresh = $this->ttlSeconds > 0 && $age < $this->ttlSeconds;
+        if (!$fresh && (!$useStale || $this->staleTtlSeconds === 0 || $age > $this->staleTtlSeconds)) {
+            return null;
+        }
+        return new CacheResult($entry[0], $entry[1], $entry[2], $fresh ? CacheStatus::HIT : CacheStatus::STALE);
     }
 
     public function checkCooldown(string $peer): void
@@ -273,25 +248,16 @@ final class TelegramCache
     }
 
     /**
-     * @return array{entries: int, loading: int, cooldowns: int}
+     * @return array{channels: int, loading: int, cooldowns: int}
      */
     public function stats(): array
     {
         $this->pruneCooldowns();
-        return ['entries' => count($this->entries->getValues(true)), 'loading' => count($this->loading), 'cooldowns' => count($this->cooldowns)];
+        return ['channels' => count($this->channels->getValues(true)), 'loading' => count($this->loading), 'cooldowns' => count($this->cooldowns)];
     }
 
-    /**
-     * @return CacheResult<mixed>|null
-     */
-    private function raw(string $key): ?CacheResult
+    private static function channelKey(string $key): string
     {
-        $item = $this->entries->getItem(hash('sha256', $key));
-        if (!$item->isHit()) {
-            return null;
-        }
-        /** @var array{0: mixed, 1: float, 2: string} $entry */
-        $entry = $item->get();
-        return new CacheResult($entry[0], $entry[1], $entry[2], CacheStatus::HIT);
+        return hash('sha256', self::normalizeChannel(explode(':', $key, 3)[1] ?? $key));
     }
 }

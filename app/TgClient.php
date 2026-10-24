@@ -190,18 +190,15 @@ class TgClient
     {
         $cancellation?->throwIfRequested();
         $peer = TelegramCache::normalizeChannel($peer);
-        $key = TelegramCache::messageKey($peer, $id);
+        $key = 'message:' . $peer . ':' . $id;
         /** @var CacheResult<Message>|null $result */
         $result = $this->cache->getCached($key, useStale: true);
         /** @var CacheResult<History>|null $history */
         $history = $this->cache->getCached(self::historyCacheKey(['peer' => $peer], true), useStale: true);
         if ($history && (!$result || $history->loadedAt > $result->loadedAt)) {
-            foreach ($history->value['messages'] ?? [] as $message) {
-                if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
-                    /** @var Message $message */
-                    $result = new CacheResult($message, $history->loadedAt, 'history', $history->status);
-                    break;
-                }
+            $message = self::findMessage($history->value['messages'] ?? [], $id);
+            if ($message !== null) {
+                $result = new CacheResult($message, $history->loadedAt, 'history', $history->status);
             }
         }
         $result ??= $this->cache->get(
@@ -209,14 +206,9 @@ class TgClient
             /** @return CacheResult<Message> */
             function (Cancellation $cancellation) use ($peer, $id): CacheResult {
                 $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]], cancellation: $cancellation), cancellation: $cancellation);
-                foreach ($data['messages'] ?? [] as $message) {
-                    if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
-                        /** @var Message $message */
-                        return new CacheResult($message, $this->cache->now(), 'getMessages', CacheStatus::MISS);
-                    }
-                }
-                $this->cache->forgetMessage($peer, $id);
-                throw new UnexpectedValueException('Empty message', 400);
+                $message = self::findMessage($data['messages'] ?? [], $id)
+                    ?? throw new UnexpectedValueException('Empty message', 400);
+                return new CacheResult($message, $this->cache->now(), 'getMessages', CacheStatus::MISS);
             },
             useStale: true,
             cancellation: $cancellation,
@@ -226,6 +218,21 @@ class TgClient
             $context->messageSource = $result->source;
         }
         return $result->value;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @return Message|null
+     */
+    private static function findMessage(array $messages, int $id): ?array
+    {
+        foreach ($messages as $message) {
+            if (($message['id'] ?? null) == $id && in_array($message['_'] ?? '', ['message', 'messageService'], true)) {
+                /** @var Message $message */
+                return $message;
+            }
+        }
+        return null;
     }
 
     /**

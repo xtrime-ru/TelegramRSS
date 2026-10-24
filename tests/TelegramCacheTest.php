@@ -271,16 +271,40 @@ final class TelegramCacheTest extends TestCase
         self::assertSame(2, $api->count('getMessages'));
     }
 
-    public function testLeastRecentlyUsedEntryIsEvictedAtTheConfiguredLimit(): void
+    public function testLeastRecentlyUsedChannelIsEvictedTogetherAtTheConfiguredLimit(): void
     {
-        $cache = new TelegramCache(maxEntries: 2);
+        $cache = new TelegramCache(maxChannels: 2);
         $load = fn (string $value) => fn () => $this->cacheResult($cache, $value);
         $cache->get('a', $load('a'));
         $cache->get('b', $load('b'));
         $cache->get('a', $load('unexpected'));
+        $cache->put('message:a:7', ['id' => 7], $cache->now(), 'getMessages');
         $cache->get('c', $load('c'));
         self::assertSame('a', $cache->get('a', $load('unexpected'))->value);
+        self::assertSame(['id' => 7], $cache->getCached('message:a:7')->value);
         self::assertSame('reloaded', $cache->get('b', $load('reloaded'))->value);
+        self::assertNull($cache->getCached('c'));
+    }
+
+    public function testDefaultsKeepTenMessagesAndAtMostFiveHundredChannels(): void
+    {
+        foreach (['CACHE_MAX_CHANNELS', 'CACHE_HISTORY_WINDOW_SIZE'] as $name) {
+            putenv($name);
+        }
+        $config = (include ROOT_DIR . '/config.php')['cache'];
+        self::assertSame([500, 10], [$config['maxChannels'], $config['historyWindowSize']]);
+        $clock = new Clock();
+        $cache = new TelegramCache(clock: fn () => $clock->time);
+        $api = new ApiFixture();
+        $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
+        $client->getHistoryHtml(['peer' => 'test']);
+        self::assertSame(10, $api->calls[0]['params']['data']['limit']);
+        foreach (range(1, 501) as $channel) {
+            $cache->put('history:channel' . $channel . ':window', [], $cache->now(), 'history');
+        }
+        self::assertSame(500, $cache->stats()['channels']);
+        self::assertNull($cache->getCached('history:channel1:window'));
+        self::assertNotNull($cache->getCached('history:channel501:window'));
     }
 
     public function testQuotaIncludesCacheHitsAndRejectedRequestsDoNotExtendIt(): void
@@ -614,7 +638,7 @@ final class TelegramCacheTest extends TestCase
             ));
         }
         self::assertSame(0, $api->count('getMessages'));
-        self::assertSame(3, $cache->stats()['entries']);
+        self::assertSame(3, $cache->stats()['channels']);
     }
 
     public function testAsyncMediaMetadataAttributesFLOODWAITToTheFeedPeerAndWarmFallbackKeepsItsAge(): void
@@ -731,7 +755,7 @@ final class TelegramCacheTest extends TestCase
     private function createClient(bool $enabled = true): array
     {
         $clock = new Clock();
-        $cache = new TelegramCache($enabled, clock: fn () => $clock->time);
+        $cache = new TelegramCache($enabled, clock: fn () => $clock->time, historyWindowSize: 100);
         $api = new ApiFixture();
         $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
         return [$clock, $cache, $api, $client];
