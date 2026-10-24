@@ -58,8 +58,14 @@ Configure caching in `.env` or `.env.docker` and restart:
 | `CACHE_HISTORY_WINDOW_SIZE` | `100` | Latest messages shared across feeds; range 1–100 |
 | `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale feeds and media messages; `0` disables stale reuse |
 
-Limits and TTLs must be non-negative. The cache lives in one process and resets
-on restart. Least recently used records are evicted when the entry limit is
+Limits and TTLs must be non-negative. Each process has its own cache. A JSONL
+snapshot in `cache/telegram-cache.jsonl` is saved on graceful shutdown and restored
+at startup, preserving data age, LRU order and active FLOOD_WAIT pauses. Downtime counts toward TTLs.
+Expired records are skipped; changed limits apply on restore. Changing the history
+window discards saved results. Snapshot errors are logged without preventing
+startup; failed saves preserve the previous file. Forced termination (SIGKILL)
+cannot save a new snapshot. `CACHE_ENABLED=0` disables snapshot reads and writes.
+Least recently used records are evicted when the entry limit is
 reached. Messages, histories and ready feeds all count toward this limit;
 there is no byte limit.
 

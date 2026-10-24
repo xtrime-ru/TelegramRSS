@@ -4,20 +4,28 @@ namespace TelegramRSS\Cache;
 
 use Amp\DeferredFuture;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use TelegramRSS\Logger;
+
+use function Amp\ByteStream\splitLines;
+use function Amp\File\deleteFile;
+use function Amp\File\isFile;
+use function Amp\File\move;
+use function Amp\File\openFile;
 
 /** Shared by all routes of one TelegramRSS process. Only arrays / scalar data are stored. */
 final class TelegramCache
 {
+    private const FILE = '/cache/telegram-cache.jsonl';
     private readonly ArrayAdapter $entries;
     /** @var array<string, DeferredFuture<CacheResult<mixed>>> */
     private array $loading = [];
-    /** @var array<string, float> Normalized peer to monotonic pause deadline. */
+    /** @var array<string, float> Normalized peer to Unix pause deadline. */
     private array $cooldowns = [];
     /** @var \Closure(): float */
     private readonly \Closure $clock;
 
     /**
-     * @param (\Closure(): float)|null $clock
+     * @param (\Closure(): float)|null $clock Unix time in seconds.
      */
     public function __construct(
         public readonly bool $enabled = true,
@@ -30,9 +38,96 @@ final class TelegramCache
         if ($maxEntries < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0 || $historyWindowSize < 1 || $historyWindowSize > 100) {
             throw new \InvalidArgumentException('Cache limits and TTLs must be non-negative; history window must be within 1-100');
         }
-        $this->clock = $clock ?? static fn (): float => hrtime(true) / 1e9;
+        $this->clock = $clock ?? static fn (): float => microtime(true);
         // ArrayAdapter treats zero as unlimited; writes are disabled separately for maxEntries=0.
         $this->entries = new ArrayAdapter(0, true, 0, max(1, $maxEntries));
+    }
+
+    public function save(): void
+    {
+        if (!$this->enabled) {
+            return;
+        }
+        $path = ROOT_DIR . self::FILE;
+        $temporary = $path . '.tmp';
+        try {
+            $file = openFile($temporary, 'wb');
+            try {
+                $this->pruneCooldowns();
+                $file->write(json_encode([
+                    'historyWindowSize' => $this->historyWindowSize,
+                    'cooldowns' => $this->cooldowns,
+                ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
+                foreach ($this->entries->getItems(array_keys($this->entries->getValues(true))) as $key => $item) {
+                    if ($item->isHit()) {
+                        $file->write(json_encode([$key, $item->get()], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n");
+                    }
+                }
+            } finally {
+                $file->close();
+            }
+            move($temporary, $path);
+        } catch (\Throwable $exception) {
+            Logger::getInstance()->error('Failed to save Telegram cache', ['path' => $path, 'exception' => $exception]);
+        } finally {
+            try {
+                if (isFile($temporary)) {
+                    deleteFile($temporary);
+                }
+            } catch (\Throwable $exception) {
+                Logger::getInstance()->error('Failed to remove temporary Telegram cache', ['path' => $temporary, 'exception' => $exception]);
+            }
+        }
+    }
+
+    public function load(): void
+    {
+        if (!$this->enabled) {
+            return;
+        }
+        $path = ROOT_DIR . self::FILE;
+        try {
+            if (!isFile($path)) {
+                return;
+            }
+            $file = openFile($path, 'rb');
+            try {
+                $header = null;
+                $now = $this->now();
+                foreach (splitLines($file) as $line) {
+                    $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                    if ($header === null) {
+                        if (!is_int($record['historyWindowSize'] ?? null) || !is_array($record['cooldowns'] ?? null)) {
+                            throw new \UnexpectedValueException('Invalid Telegram cache snapshot');
+                        }
+                        $header = $record;
+                        $this->cooldowns = array_filter($header['cooldowns'], static fn (float $until): bool => $until > $now);
+                        continue;
+                    }
+                    if ($this->maxEntries === 0 || $header['historyWindowSize'] !== $this->historyWindowSize) {
+                        continue;
+                    }
+                    if (!is_array($record) || !array_is_list($record) || count($record) !== 2) {
+                        throw new \UnexpectedValueException('Invalid Telegram cache entry');
+                    }
+                    [$key, $entry] = $record;
+                    if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
+                        || !is_numeric($entry[1]) || !is_string($entry[2])) {
+                        throw new \UnexpectedValueException('Invalid Telegram cache entry');
+                    }
+                    if ($entry[1] <= $now && $now - $entry[1] <= max($this->ttlSeconds, $this->staleTtlSeconds)) {
+                        $this->entries->save($this->entries->getItem($key)->set($entry));
+                    }
+                }
+                if ($header === null) {
+                    throw new \UnexpectedValueException('Empty Telegram cache snapshot');
+                }
+            } finally {
+                $file->close();
+            }
+        } catch (\Throwable $exception) {
+            Logger::getInstance()->error('Failed to load Telegram cache', ['path' => $path, 'exception' => $exception]);
+        }
     }
 
     public function now(): float
@@ -186,7 +281,7 @@ final class TelegramCache
     public function stats(): array
     {
         $this->pruneCooldowns();
-        return ['entries' => count($this->entries->getValues()), 'loading' => count($this->loading), 'cooldowns' => count($this->cooldowns)];
+        return ['entries' => count($this->entries->getValues(true)), 'loading' => count($this->loading), 'cooldowns' => count($this->cooldowns)];
     }
 
     /**

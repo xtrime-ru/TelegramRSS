@@ -28,6 +28,7 @@ final class Server
      */
     public function __construct(TgClient $client, string $address = '', string $port = '')
     {
+        $client->getCache()->load();
         $server = new SocketHttpServer(
             logger: Logger::getInstance(),
             serverSocketFactory: new ConnectionLimitingServerSocketFactory(new LocalSemaphore(1000)),
@@ -48,6 +49,7 @@ final class Server
         );
 
         $errorHandler = new ErrorResponse();
+        $server->onStop($client->getCache()->save(...));
         $server->start((new Router($client, $server, $errorHandler))->getRouter(), $errorHandler);
 
         self::registerShutdown($server);
@@ -59,7 +61,7 @@ final class Server
      *
      *
      */
-    private static function registerShutdown(SocketHttpServer $server)
+    private static function registerShutdown(SocketHttpServer $server): void
     {
         if (defined('SIGINT')) {
             // Await SIGINT or SIGTERM to be received.
