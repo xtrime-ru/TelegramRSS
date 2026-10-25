@@ -56,6 +56,7 @@ return [
         'enabled' => getenv('CACHE_ENABLED') === false || filter_var(getenv('CACHE_ENABLED'), FILTER_VALIDATE_BOOLEAN),
         'maxChannels' => (int) (getenv('CACHE_MAX_CHANNELS') !== false ? getenv('CACHE_MAX_CHANNELS') : 500),
         'ttlSeconds' => (int) (getenv('CACHE_TTL_SECONDS') !== false ? getenv('CACHE_TTL_SECONDS') : 60),
+        'cleanupIntervalSeconds' => (int) (getenv('CACHE_CLEANUP_INTERVAL_SECONDS') !== false ? getenv('CACHE_CLEANUP_INTERVAL_SECONDS') : 60),
         'staleTtlSeconds' => (int) (getenv('CACHE_STALE_TTL_SECONDS') !== false ? getenv('CACHE_STALE_TTL_SECONDS') : 900),
     ],
     'log' => [

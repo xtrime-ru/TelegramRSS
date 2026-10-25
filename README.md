@@ -58,13 +58,14 @@ Configure caching in `.env` or `.env.docker` and restart:
 | `CACHE_MAX_CHANNELS` | `500` | Maximum peers (channels/groups/dialogs); `0` disables storage |
 | `CACHE_TTL_SECONDS` | `60` | Freshness period; `0` disables fresh reuse |
 | `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale peer data; `0` disables stale reuse |
+| `CACHE_CLEANUP_INTERVAL_SECONDS` | `60` | Minimum interval between expiry sweeps on peer updates; `0` cleans on every update |
 
 History loads exactly the requested number of messages. A request for 10 and
 then 50 messages retains 50, shared between RSS, JSON and media. A shorter refresh
 preserves the longer order when the received prefix agrees; a conflicting head
 replaces the order. Only received messages become fresh. Cache hits never extend
 freshness. Old messages remain available for media until expiry or eviction.
-Peer information
+Concurrent smaller requests share a pending larger history load. Peer information
 from history also serves information lookups, without storing a second copy.
 Pagination within the retained window reuses it; anchored requests and pages
 outside it bypass history caching. Channel names are case-insensitive and an
@@ -72,7 +73,8 @@ initial `@`, client IP or unused parameters do not create separate entries.
 
 Each process has its own cache. Least recently used peers are evicted as a whole.
 There is no byte limit or separate limit on messages within a peer;
-expired entries are cleaned when the peer is updated. Access rules and client
+expired entries are cleaned periodically when the peer is updated. Expired data
+is never reused beyond its configured TTL while awaiting cleanup. Access rules and client
 quotas apply before cache reuse. Groups and private dialogs still require
 `ONLY_PUBLIC_CHANNELS=0`.
 

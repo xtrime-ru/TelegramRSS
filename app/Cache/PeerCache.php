@@ -28,6 +28,7 @@ final class PeerCache
     public ?int $infoId = null;
     public int $historyLimit = 0;
     public bool $historyComplete = false;
+    public float $nextCleanupAt = 0;
 
     /** @param array<string, mixed> $history */
     public function updateHistory(string $peer, array $history, float $loadedAt, int $limit): void

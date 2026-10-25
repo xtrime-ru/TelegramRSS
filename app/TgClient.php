@@ -113,7 +113,7 @@ class TgClient
         $result = $this->cache->resolve(
             fn (bool $stale) => $cacheable ? $this->cache->history($data['peer'], $data['limit'], $data['add_offset'], $stale) : null,
             fn (Cancellation $shared) => $store
-                ? $this->cache->fetch('history:' . $data['peer'] . ':' . $data['limit'], $loader, $shared)
+                ? $this->cache->fetchHistory($data['peer'], $data['limit'], $loader, $shared)
                 : $this->cache->fetch('history:bypass:' . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR)), $loader, $shared),
             $cacheable ? ($context?->readMode ?? CacheReadMode::Fresh) : CacheReadMode::Fresh,
             $cancellation,

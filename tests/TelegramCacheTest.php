@@ -56,6 +56,66 @@ final class TelegramCacheTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    public function testPendingLargerHistoryServesSmallerReadersAndRetriesOnlyIfTheReplyIsPartial(): void
+    {
+        foreach ([[50, 10, false], [50, 10, true], [100, 30, false]] as [$limit, $smaller, $cancelOwner]) {
+            [, , $api, $client] = $this->createClient();
+            /** @var DeferredFuture<void> $started */
+            $started = new DeferredFuture();
+            /** @var DeferredFuture<void> $resume */
+            $resume = new DeferredFuture();
+            $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api, $started, $resume, $limit) {
+                $query = $p['data'];
+                if ($query['limit'] === $limit) {
+                    $started->complete();
+                    $resume->getFuture()->await();
+                    if ($limit === 100) {
+                        $query['limit'] = 20;
+                    }
+                }
+                return $api->response($r, $api->history($query));
+            };
+            $owner = new \Amp\DeferredCancellation();
+            $large = async(fn () => $client->getHistoryHtml(['peer' => 'test', 'limit' => $limit], cancellation: $owner->getCancellation()));
+            $started->getFuture()->await();
+            $small = async(fn () => $client->getHistoryHtml(['peer' => '@TEST', 'limit' => $smaller]));
+            delay(0);
+            self::assertSame(1, $api->count('getHistoryHtml'));
+            $cancel = new \Amp\DeferredCancellation();
+            $departing = async(fn () => $client->getHistoryHtml(['peer' => 'test', 'limit' => 5], cancellation: $cancel->getCancellation()));
+            delay(0);
+            $cancel->cancel();
+            self::assertThrows(fn () => $departing->await(), \Amp\CancelledException::class);
+            if ($cancelOwner) {
+                $owner->cancel();
+                self::assertThrows(fn () => $large->await(), \Amp\CancelledException::class);
+            }
+            $resume->complete();
+            if (!$cancelOwner) {
+                self::assertCount($limit === 100 ? 20 : 50, $large->await()['messages']);
+            }
+            self::assertCount($smaller, $small->await()['messages']);
+            self::assertSame($limit === 100 ? 2 : 1, $api->count('getHistoryHtml'));
+        }
+    }
+
+    public function testCleanupIsBatchedWithoutMakingExpiredMessagesReadable(): void
+    {
+        $clock = new Clock();
+        $cache = new TelegramCache(clock: fn () => $clock->time, ttlSeconds: 1, staleTtlSeconds: 2, cleanupIntervalSeconds: 60);
+        $api = new ApiFixture();
+        $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
+        $client->getMessage('test', 7);
+        $clock->time += 3;
+        $client->getInfo('test');
+        self::assertNull($cache->read($cache->peer('test')->messages[7], useStale: true));
+        self::assertSame(1, $cache->stats()->messages);
+        $clock->time = 1060;
+        $client->getInfo('test');
+        self::assertSame(0, $cache->stats()->messages);
+        self::assertGreaterThan(0, $cache->stats()->payloadBytes);
+    }
+
     public function testGroupsAndPrivateDialogsKeepTheirOwnMessagesInfoAndAccessRules(): void
     {
         [, , $api, $client] = $this->createClient();

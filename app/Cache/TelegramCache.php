@@ -18,6 +18,8 @@ final class TelegramCache
     private MemoryCache $channels;
     /** @var array<string, SharedLoad<mixed>> */
     private array $loading = [];
+    /** @var array<string, array<int, string>> Head limits to in-flight operation keys. */
+    private array $historyLoads = [];
     /** @var array<array-key, float> Normalized peer to Unix pause deadline. */
     private array $cooldowns = [];
     /** @var \Closure(): float */
@@ -32,8 +34,9 @@ final class TelegramCache
         ?\Closure $clock = null,
         public readonly int $ttlSeconds = 60,
         private readonly int $staleTtlSeconds = 900,
+        private readonly int $cleanupIntervalSeconds = 60,
     ) {
-        if ($maxChannels < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0) {
+        if ($maxChannels < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0 || $cleanupIntervalSeconds < 0) {
             throw new \InvalidArgumentException('Cache limits and TTLs must be non-negative');
         }
         $this->clock = $clock ?? static fn (): float => microtime(true);
@@ -183,7 +186,11 @@ final class TelegramCache
         if (!$this->enabled || $this->maxChannels === 0) {
             return;
         }
-        $data->prune($this->now() - max($this->ttlSeconds, $this->staleTtlSeconds));
+        $now = $this->now();
+        if ($now >= $data->nextCleanupAt) {
+            $data->prune($now - max($this->ttlSeconds, $this->staleTtlSeconds));
+            $data->nextCleanupAt = $now + $this->cleanupIntervalSeconds;
+        }
         $this->channels->setValue(self::normalizeChannel($peer), $data);
     }
 
@@ -220,6 +227,42 @@ final class TelegramCache
         }
         return $coalesced && !in_array($result->status, [CacheStatus::STALE, CacheStatus::BYPASS], true)
             ? $result->withStatus(CacheStatus::COALESCED) : $result;
+    }
+
+    /**
+     * @param \Closure(Cancellation): CacheResult<array<string, mixed>> $loader
+     * @return CacheResult<array<string, mixed>>
+     */
+    public function fetchHistory(string $peer, int $limit, \Closure $loader, ?Cancellation $cancellation): CacheResult
+    {
+        $peer = self::normalizeChannel($peer);
+        try {
+            foreach ($this->historyLoads[$peer] ?? [] as $size => $pending) {
+                if ($size >= $limit && isset($this->loading[$pending]) && !$this->loading[$pending]->isFinished()) {
+                    $result = $this->fetch($pending, $loader, $cancellation);
+                    $history = $result->value;
+                    if (count($history['messages'] ?? []) >= $limit
+                        || (isset($history['count']) && $history['count'] <= count($history['messages'] ?? []))
+                        || $size === $limit) {
+                        $history['messages'] = array_slice($history['messages'] ?? [], 0, $limit);
+                        return new CacheResult($history, $result->loadedAt, $result->source, $result->status);
+                    }
+                    break; // A larger partial response cannot answer this exact smaller query.
+                }
+            }
+            $key = 'history:' . $peer . ':' . $limit;
+            $this->historyLoads[$peer][$limit] = $key;
+            return $this->fetch($key, $loader, $cancellation);
+        } finally {
+            foreach ($this->historyLoads[$peer] ?? [] as $size => $key) {
+                if (!isset($this->loading[$key])) {
+                    unset($this->historyLoads[$peer][$size]);
+                }
+            }
+            if (empty($this->historyLoads[$peer])) {
+                unset($this->historyLoads[$peer]);
+            }
+        }
     }
 
     /**
@@ -327,7 +370,15 @@ final class TelegramCache
     public function stats(): CacheStats
     {
         $this->pruneCooldowns();
-        return new CacheStats(count($this->channels->getValues()), count($this->loading), count($this->cooldowns));
+        $peers = $this->channels->getValues();
+        $messages = $bytes = 0;
+        foreach ($peers as $peer) {
+            $messages += count($peer->messages);
+            foreach ($peer->entries() as $entry) {
+                $bytes += strlen($entry->data);
+            }
+        }
+        return new CacheStats(count($peers), count($this->loading), count($this->cooldowns), $messages, $bytes);
     }
 
 }
