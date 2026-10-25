@@ -17,7 +17,7 @@ final class ForbiddenPeers
 
     private static ?string $regex = null;
 
-    /** @var array<string, string>|null */
+    /** @var array<array-key, string>|null */
     private static ?array $peers = null;
 
     private const FILE = ROOT_DIR . '/cache/forbidden-peers.csv';

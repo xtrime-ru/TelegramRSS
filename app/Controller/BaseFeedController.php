@@ -19,34 +19,18 @@ abstract class BaseFeedController implements RequestHandler
     ) {
     }
 
-    /**
-     * @return array{page: int, limit: int, id: int}
-     */
-    public static function getHistoryParameters(Request $request): array
+    public static function getHistoryParameters(Request $request): FeedParameters
     {
         $page = (int)(
             $request->getAttribute(Router::class)['page']
             ?? $request->getQueryParameter('page')
             ?: 1
         );
-        return [
-            'page' => max(1, $page),
-            'limit' => max(1, min((int)($request->getQueryParameter('limit') ?? self::LIMIT_DEFAULT), self::LIMIT_MAX)),
-            'id' => (int)($request->getQueryParameter('id') ?? 0),
-        ];
-    }
-
-    /**
-     * @param array{page: int, limit: int, id: int} $params
-     * @return array{limit: int, add_offset: int, offset_id: int}
-     */
-    public static function getHistoryQuery(array $params): array
-    {
-        return [
-            'limit' => $params['limit'],
-            'add_offset' => ($params['page'] - 1) * $params['limit'],
-            'offset_id' => $params['id'] ? $params['id'] + 1 : 0,
-        ];
+        return new FeedParameters(
+            max(1, $page),
+            max(1, min((int)($request->getQueryParameter('limit') ?? self::LIMIT_DEFAULT), self::LIMIT_MAX)),
+            (int)($request->getQueryParameter('id') ?? 0),
+        );
     }
 
     /**
@@ -61,7 +45,7 @@ abstract class BaseFeedController implements RequestHandler
         $isChannel = in_array($this->client->getInfo($channel, context: $context, cancellation: $cancellation)['type'], ['channel', 'supergroup']);
 
         $result = $this->client->getHistoryHtml(
-            ['peer' => $channel] + self::getHistoryQuery(self::getHistoryParameters($request)),
+            ['peer' => $channel] + self::getHistoryParameters($request)->toHistoryQuery(),
             $context,
             $cancellation,
         );

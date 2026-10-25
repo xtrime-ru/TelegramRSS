@@ -44,8 +44,8 @@ class Logger extends AbstractLogger
     private static string $dateTimeFormat = 'Y-m-d H:i:s';
     public int $minLevelIndex;
 
-    /** @var callable(string, string, array<string, mixed>): string  */
-    private $formatter;
+    /** @var \Closure(string, string, array<string, mixed>): string */
+    private \Closure $formatter;
 
     /**
      * @param (callable(string, string, array<string, mixed>): string)|null $formatter
@@ -77,7 +77,7 @@ class Logger extends AbstractLogger
         }
 
         $this->minLevelIndex = self::$levels[$minLevel];
-        $this->formatter = $formatter ?: $this->format(...);
+        $this->formatter = \Closure::fromCallable($formatter ?? $this->format(...));
     }
 
     public static function getInstance(): Logger

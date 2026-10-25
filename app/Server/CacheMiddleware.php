@@ -44,7 +44,7 @@ final class CacheMiddleware implements Middleware
             return $response;
         }
         $params = BaseFeedController::getHistoryParameters($request);
-        $context->cacheResponse = $params['id'] === 0 && $this->client->usesHistoryWindow(BaseFeedController::getHistoryQuery($params));
+        $context->cacheResponse = $params->id === 0 && $this->client->usesHistoryWindow($params->toHistoryQuery());
         $key = 'response:' . $channel . ':' . $this->format . ':' . hash('sha256', json_encode($params, JSON_THROW_ON_ERROR));
         /** @var CacheResult<array{status: int, headers: array<string, list<string>>, body: string}> $result */
         $result = $cache->get($key, function (Cancellation $shared) use ($request, $requestHandler, $context, $cache, $channel, $key): CacheResult {

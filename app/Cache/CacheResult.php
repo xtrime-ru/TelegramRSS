@@ -9,6 +9,7 @@ final class CacheResult
      * @param T $value
      */
     public function __construct(
+        /** @var T */
         public readonly mixed $value,
         public readonly float $loadedAt,
         public readonly string $source,
