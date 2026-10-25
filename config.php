@@ -57,7 +57,6 @@ return [
         'maxChannels' => (int) (getenv('CACHE_MAX_CHANNELS') !== false ? getenv('CACHE_MAX_CHANNELS') : 500),
         'ttlSeconds' => (int) (getenv('CACHE_TTL_SECONDS') !== false ? getenv('CACHE_TTL_SECONDS') : 60),
         'staleTtlSeconds' => (int) (getenv('CACHE_STALE_TTL_SECONDS') !== false ? getenv('CACHE_STALE_TTL_SECONDS') : 900),
-        'historyWindowSize' => (int) (getenv('CACHE_HISTORY_WINDOW_SIZE') !== false ? getenv('CACHE_HISTORY_WINDOW_SIZE') : 10),
     ],
     'log' => [
         'dir' => (string) getenv('LOGS_DIR'),

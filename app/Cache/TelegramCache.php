@@ -4,7 +4,6 @@ namespace TelegramRSS\Cache;
 
 use Amp\Cancellation;
 use Amp\NullCancellation;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use TelegramRSS\Logger;
 
 use function Amp\File\isFile;
@@ -15,10 +14,11 @@ final class TelegramCache
     use JsonlFileStorage;
 
     private const FILE = '/cache/telegram-cache.jsonl';
-    private readonly ArrayAdapter $channels;
-    /** @var array<string, SharedLoad> */
+    /** @var MemoryCache<PeerCache> */
+    private MemoryCache $channels;
+    /** @var array<string, SharedLoad<mixed>> */
     private array $loading = [];
-    /** @var array<string, float> Normalized peer to Unix pause deadline. */
+    /** @var array<array-key, float> Normalized peer to Unix pause deadline. */
     private array $cooldowns = [];
     /** @var \Closure(): float */
     private readonly \Closure $clock;
@@ -32,14 +32,12 @@ final class TelegramCache
         ?\Closure $clock = null,
         public readonly int $ttlSeconds = 60,
         private readonly int $staleTtlSeconds = 900,
-        public readonly int $historyWindowSize = 10,
     ) {
-        if ($maxChannels < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0 || $historyWindowSize < 1 || $historyWindowSize > 100) {
-            throw new \InvalidArgumentException('Cache limits and TTLs must be non-negative; history window must be within 1-100');
+        if ($maxChannels < 0 || $ttlSeconds < 0 || $staleTtlSeconds < 0) {
+            throw new \InvalidArgumentException('Cache limits and TTLs must be non-negative');
         }
         $this->clock = $clock ?? static fn (): float => microtime(true);
-        // ArrayAdapter treats zero as unlimited; writes are disabled separately for maxChannels=0.
-        $this->channels = new ArrayAdapter(0, true, 0, max(1, $maxChannels));
+        $this->channels = new MemoryCache($maxChannels);
     }
 
     public function save(): void
@@ -49,14 +47,25 @@ final class TelegramCache
         }
         $records = (function (): \Generator {
             $this->pruneCooldowns();
-            yield ['historyWindowSize' => $this->historyWindowSize, 'unit' => 'channel', 'cooldowns' => $this->cooldowns];
-            foreach ($this->channels->getItems(array_keys($this->channels->getValues(true))) as $key => $item) {
-                if ($item->isHit()) {
-                    yield [$key, $item->get()];
+            yield ['version' => 3, 'cooldowns' => $this->cooldowns];
+            foreach ($this->channels->getValues() as $peer => $channel) {
+                $channel = clone $channel;
+                $channel->prune($this->now() - max($this->ttlSeconds, $this->staleTtlSeconds));
+                foreach ($channel->entries() as $key => $entry) {
+                    $value = $entry->unpack();
+                    if ($key === 'history') {
+                        $value = ['ids' => $channel->historyIds, 'limit' => $channel->historyLimit, 'complete' => $channel->historyComplete, 'chats' => $channel->historyChatIds, 'users' => $channel->historyUserIds, 'infoId' => $channel->infoId, 'data' => $value];
+                    }
+                    yield [(string) $peer, $key, $entry->loadedAt, $entry->source, $value];
                 }
             }
+            yield ['end' => true];
         })();
-        $this->writeCacheFile(ROOT_DIR . self::FILE, $records);
+        $compressed = CacheEntry::compressionAvailable();
+        $path = ROOT_DIR . self::FILE . ($compressed ? '.zst' : '');
+        if ($this->writeCacheFile($path, $records, compressed: $compressed)) {
+            $this->removeCacheFile(ROOT_DIR . self::FILE . ($compressed ? '' : '.zst'));
+        }
     }
 
     public function load(): void
@@ -64,51 +73,70 @@ final class TelegramCache
         if (!$this->enabled) {
             return;
         }
-        $path = ROOT_DIR . self::FILE;
         try {
+            $path = ROOT_DIR . self::FILE;
+            if (CacheEntry::compressionAvailable() && isFile($path . '.zst')) {
+                $path .= '.zst';
+            }
             if (!isFile($path)) {
                 return;
             }
-            $header = null;
+            /** @var MemoryCache<PeerCache> $restored */
+            $restored = new MemoryCache($this->maxChannels);
+            $cooldowns = null;
+            $complete = false;
             $now = $this->now();
-            foreach ($this->readCacheLines($path) as $line) {
+            foreach ($this->readCacheLines($path, compressed: str_ends_with($path, '.zst')) as $line) {
                 $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                if ($header === null) {
-                    if (!is_int($record['historyWindowSize'] ?? null) || !is_array($record['cooldowns'] ?? null)) {
-                        throw new \UnexpectedValueException('Invalid Telegram cache snapshot');
-                    }
-                    $header = $record;
-                    $this->cooldowns = array_filter($header['cooldowns'], static fn (float $until): bool => $until > $now);
-                    if ($this->maxChannels === 0 || ($header['unit'] ?? null) !== 'channel' || $header['historyWindowSize'] !== $this->historyWindowSize) {
+                if ($complete) {
+                    throw new \UnexpectedValueException('Unexpected data after cache end');
+                }
+                if ($cooldowns === null) {
+                    if (($record['version'] ?? null) !== 3) {
+                        Logger::getInstance()->notice('Ignoring old Telegram cache format', ['path' => $path, 'version' => $record['version'] ?? null]);
                         return;
                     }
+                    if (!is_array($record['cooldowns'] ?? null)) {
+                        throw new \UnexpectedValueException('Invalid Telegram cache snapshot');
+                    }
+                    $cooldowns = array_filter($record['cooldowns'], static fn (float $until): bool => $until > $now);
                     continue;
                 }
-                if (!is_array($record) || !array_is_list($record) || count($record) !== 2) {
+                if ($record === ['end' => true]) {
+                    $complete = true;
+                    continue;
+                }
+                if (!is_array($record) || !array_is_list($record) || count($record) !== 5
+                    || !is_string($record[0]) || !is_string($record[1])
+                    || !is_numeric($record[2]) || !is_string($record[3])) {
                     throw new \UnexpectedValueException('Invalid Telegram cache entry');
                 }
-                [$channel, $values] = $record;
-                if (!is_string($channel) || !is_array($values)) {
-                    throw new \UnexpectedValueException('Invalid Telegram cache channel');
+                [$peer, $key, $loadedAt, $source, $value] = $record;
+                if ($this->maxChannels === 0 || $loadedAt > $now || $now - $loadedAt > max($this->ttlSeconds, $this->staleTtlSeconds)) {
+                    continue;
                 }
-                foreach ($values as $key => $entry) {
-                    if (!is_string($key) || !is_array($entry) || !array_is_list($entry) || count($entry) !== 3
-                        || !is_numeric($entry[1]) || !is_string($entry[2])) {
-                        throw new \UnexpectedValueException('Invalid Telegram cache entry');
-                    }
-                    if ($entry[1] > $now || $now - $entry[1] > max($this->ttlSeconds, $this->staleTtlSeconds)) {
-                        unset($values[$key]);
-                    }
+                $channel = $restored->getValue($peer) ?? new PeerCache();
+                if ($key === 'history') {
+                    $channel->historyIds = $value['ids'];
+                    $channel->historyLimit = $value['limit'];
+                    $channel->historyComplete = $value['complete'];
+                    $channel->historyChatIds = $value['chats'];
+                    $channel->historyUserIds = $value['users'];
+                    $channel->infoId = $value['infoId'];
+                    $value = $value['data'];
+                } elseif ($key === 'info') {
+                    $channel->infoId = $value['bot_api_id'] ?? $channel->infoId;
                 }
-                if ($values) {
-                    $this->channels->save($this->channels->getItem($channel)->set($values));
-                }
+                $channel->restore($key, CacheEntry::pack($value, (float) $loadedAt, $source));
+                $restored->setValue($peer, $channel);
             }
-            if ($header === null) {
-                throw new \UnexpectedValueException('Empty Telegram cache snapshot');
+            if (!$complete) {
+                throw new \UnexpectedValueException('Incomplete Telegram cache snapshot');
             }
+            $this->channels = $restored;
+            $this->cooldowns = $cooldowns;
         } catch (\Throwable $exception) {
-            Logger::getInstance()->error('Failed to load Telegram cache', ['path' => $path, 'exception' => $exception]);
+            Logger::getInstance()->error('Failed to load Telegram cache', ['exception' => $exception]);
         }
     }
 
@@ -125,29 +153,64 @@ final class TelegramCache
 
     /**
      * @template T
+     * @param \Closure(bool): ?CacheResult<T> $read
      * @param \Closure(Cancellation): CacheResult<T> $loader
      * @return CacheResult<T>
      */
-    public function get(string $key, \Closure $loader, bool $useStale = false, ?Cancellation $cancellation = null): CacheResult
+    public function resolve(\Closure $read, \Closure $loader, CacheReadMode $mode = CacheReadMode::Fresh, ?Cancellation $cancellation = null): CacheResult
     {
         $cancellation?->throwIfRequested();
-        if (!$this->enabled) {
-            return $loader($cancellation ?? new NullCancellation)->withStatus(CacheStatus::BYPASS);
-        }
-        /** @var CacheResult<T>|null $cached The key and loader describe the same payload type. */
-        $cached = $this->getCached($key, $useStale);
-        if ($cached) {
+        if ($this->enabled && ($cached = $read($mode === CacheReadMode::Stale))) {
             return $cached;
         }
+        try {
+            $result = $loader($cancellation ?? new NullCancellation);
+            return $this->enabled ? $result : $result->withStatus(CacheStatus::BYPASS);
+        } catch (FloodWaitException $exception) {
+            return $this->enabled && $mode === CacheReadMode::OnFlood
+                ? ($read(true)?->withStatus(CacheStatus::STALE) ?? throw $exception)
+                : throw $exception;
+        }
+    }
+
+    public function peer(string $peer): PeerCache
+    {
+        return $this->enabled ? ($this->channels->getValue(self::normalizeChannel($peer)) ?? new PeerCache()) : new PeerCache();
+    }
+
+    public function commit(string $peer, PeerCache $data): void
+    {
+        if (!$this->enabled || $this->maxChannels === 0) {
+            return;
+        }
+        $data->prune($this->now() - max($this->ttlSeconds, $this->staleTtlSeconds));
+        $this->channels->setValue(self::normalizeChannel($peer), $data);
+    }
+
+    /**
+     * @template T
+     * @param CacheEntry<T>|null $entry
+     * @return CacheResult<T>|null
+     */
+    public function read(?CacheEntry $entry, bool $useStale = false): ?CacheResult
+    {
+        if (!$this->enabled || !$entry || ($status = $this->entryStatus($entry, $useStale)) === null) {
+            return null;
+        }
+        return new CacheResult($entry->unpack(), $entry->loadedAt, $entry->source, $status);
+    }
+
+    /**
+     * @template T
+     * @param \Closure(Cancellation): CacheResult<T> $loader
+     * @return CacheResult<T>
+     */
+    public function fetch(string $key, \Closure $loader, ?Cancellation $cancellation = null): CacheResult
+    {
+        $cancellation?->throwIfRequested();
         $coalesced = isset($this->loading[$key]);
-        $load = $this->loading[$key] ??= new SharedLoad(function (Cancellation $shared) use ($key, $loader): CacheResult {
-            $result = $loader($shared);
-            $shared->throwIfRequested();
-            if ($result->status !== CacheStatus::BYPASS) {
-                $this->put($key, $result->value, $result->loadedAt, $result->source);
-            }
-            return $result;
-        });
+        /** @var SharedLoad<T> $load The key identifies a single loader/result contract. */
+        $load = $this->loading[$key] ??= new SharedLoad($loader);
         try {
             $result = $load->await($cancellation);
         } finally {
@@ -159,37 +222,79 @@ final class TelegramCache
             ? $result->withStatus(CacheStatus::COALESCED) : $result;
     }
 
-    public function put(string $key, mixed $value, float $loadedAt, string $source): void
-    {
-        if (!$this->enabled || $this->maxChannels === 0) {
-            return;
-        }
-        $item = $this->channels->getItem(self::channelKey($key));
-        $now = $this->now();
-        $oldest = $now - max($this->ttlSeconds, $this->staleTtlSeconds);
-        /** @var array<string, array{mixed, float, string}> $values */
-        $values = array_filter($item->get() ?? [], static fn (array $entry): bool => $entry[1] >= $oldest && $entry[1] <= $now);
-        $values[$key] = [$value, $loadedAt, $source];
-        $this->channels->save($item->set($values));
-    }
-
-    /** @return CacheResult<mixed>|null */
-    public function getCached(string $key, bool $useStale = false): ?CacheResult
+    /**
+     * Check requested positions and ages before decompressing any payload.
+     * @return CacheResult<array<string, mixed>>|null
+     */
+    public function history(string $peer, int $limit, int $offset = 0, bool $useStale = false): ?CacheResult
     {
         if (!$this->enabled) {
             return null;
         }
-        /** @var array{mixed, float, string}|null $entry */
-        $entry = $this->channels->getItem(self::channelKey($key))->get()[$key] ?? null;
-        if ($entry === null) {
+        $channel = $this->peer($peer);
+        $entry = $channel->history;
+        if (!$entry || ($status = $this->entryStatus($entry, $useStale)) === null) {
             return null;
         }
-        $age = $this->now() - $entry[1];
-        $fresh = $this->ttlSeconds > 0 && $age < $this->ttlSeconds;
-        if (!$fresh && (!$useStale || $this->staleTtlSeconds === 0 || $age > $this->staleTtlSeconds)) {
+        if ($offset + $limit > count($channel->historyIds) && !$channel->historyComplete) {
             return null;
         }
-        return new CacheResult($entry[0], $entry[1], $entry[2], $fresh ? CacheStatus::HIT : CacheStatus::STALE);
+        $ids = array_slice($channel->historyIds, $offset, $limit, true);
+        $loadedAt = $entry->loadedAt;
+        foreach ($ids as $id) {
+            if ($id === null) {
+                continue;
+            }
+            $message = $channel->messages[$id] ?? null;
+            // getMessages returns raw text; only getHistoryHtml supplies the feed's HTML format.
+            if (!$message || $message->source !== 'history' || ($messageStatus = $this->entryStatus($message, $useStale)) === null) {
+                return null;
+            }
+            $loadedAt = min($loadedAt, $message->loadedAt);
+            if ($messageStatus === CacheStatus::STALE) {
+                $status = CacheStatus::STALE;
+            }
+        }
+        $history = $entry->unpack();
+        $messages = [];
+        foreach ($ids as $position => $id) {
+            $messages[] = $id === null ? $history['messages'][$position] : $channel->messages[$id]->unpack();
+        }
+        $history['messages'] = $messages;
+        foreach (['chats' => $channel->historyChatIds, 'users' => $channel->historyUserIds] as $field => $refs) {
+            if (!array_key_exists($field, $history)) {
+                continue;
+            }
+            $entities = [];
+            foreach ($refs as $position => $id) {
+                $info = $id === null ? null : $channel->peerInfo((string) $id)?->unpack();
+                $entity = $id === null ? ($history[$field][$position] ?? null) : ($info[$field === 'users' ? 'User' : 'Chat'] ?? null);
+                if ($entity !== null) {
+                    $entities[] = $entity;
+                }
+            }
+            $history[$field] = $entities;
+        }
+        return new CacheResult($history, $loadedAt, 'history', $status);
+    }
+
+    public function hasHistoryRange(string $peer, int $offset, int $limit): bool
+    {
+        $channel = $this->peer($peer);
+        return $offset + $limit <= $channel->historyLimit;
+    }
+
+    /** @param CacheEntry<mixed> $entry */
+    private function entryStatus(CacheEntry $entry, bool $useStale): ?CacheStatus
+    {
+        $age = $this->now() - $entry->loadedAt;
+        if ($age < 0) {
+            return null;
+        }
+        if ($this->ttlSeconds > 0 && $age < $this->ttlSeconds) {
+            return CacheStatus::HIT;
+        }
+        return $useStale && $this->staleTtlSeconds > 0 && $age <= $this->staleTtlSeconds ? CacheStatus::STALE : null;
     }
 
     public function checkCooldown(string $peer): void
@@ -219,17 +324,10 @@ final class TelegramCache
         }
     }
 
-    /**
-     * @return array{channels: int, loading: int, cooldowns: int}
-     */
-    public function stats(): array
+    public function stats(): CacheStats
     {
         $this->pruneCooldowns();
-        return ['channels' => count($this->channels->getValues(true)), 'loading' => count($this->loading), 'cooldowns' => count($this->cooldowns)];
+        return new CacheStats(count($this->channels->getValues()), count($this->loading), count($this->cooldowns));
     }
 
-    private static function channelKey(string $key): string
-    {
-        return hash('sha256', self::normalizeChannel(explode(':', $key, 3)[1] ?? $key));
-    }
 }

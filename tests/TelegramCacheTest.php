@@ -26,6 +26,8 @@ use TelegramRSS\AccessControl\AccessControl;
 use TelegramRSS\AccessControl\ForbiddenPeers;
 use TelegramRSS\AccessControl\User;
 use TelegramRSS\Cache\CacheContext;
+use TelegramRSS\Cache\CacheEntry;
+use TelegramRSS\Cache\CacheReadMode;
 use TelegramRSS\Cache\TelegramCache;
 use TelegramRSS\Cache\CacheResult;
 use TelegramRSS\Cache\CacheStatus;
@@ -53,6 +55,162 @@ use function Amp\Http\Server\Middleware\stackMiddleware;
 final class TelegramCacheTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
+
+    public function testGroupsAndPrivateDialogsKeepTheirOwnMessagesInfoAndAccessRules(): void
+    {
+        [, , $api, $client] = $this->createClient();
+        $entities = [
+            '-42' => ['_' => 'chat', 'id' => -42, 'title' => 'Group'],
+            '123' => ['_' => 'user', 'id' => 123, 'first_name' => 'Person'],
+            '-1000000000042' => ['_' => 'channel', 'id' => -1000000000042, 'megagroup' => true, 'title' => 'Supergroup'],
+            'me' => ['_' => 'user', 'id' => 456, 'self' => true, 'first_name' => 'Me'],
+            'alice' => ['_' => 'user', 'id' => 789, 'username' => 'Alice', 'first_name' => 'Empty dialog'],
+        ];
+        $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api, $entities) {
+            $peer = $p['data']['peer'];
+            $entity = $entities[$peer];
+            $message = $api->message(7);
+            $message['message'] = $peer;
+            $message['peer_id'] = $entity['id'];
+            return $api->response($r, ['messages' => $peer === 'alice' ? [] : [$message], 'count' => $peer === 'alice' ? 0 : 1,
+                'chats' => $entity['_'] === 'user' ? [] : [$entity],
+                'users' => $entity['_'] === 'user' ? [$entity] : []]);
+        };
+        foreach (['-42' => 'chat', '123' => 'user', '-1000000000042' => 'supergroup', 'me' => 'user', 'alice' => 'user'] as $peer => $type) {
+            $peer = (string) $peer;
+            Config::getInstance()->config['access']['only_public_channels'] = true;
+            $client->getHistoryHtml(['peer' => $peer, 'limit' => 1]);
+            self::assertSame($type, $client->getInfo($peer)['type']);
+            if ($type !== 'supergroup') {
+                self::assertSame(403, $this->handle($client, $this->request(channel: $peer))->getStatus());
+            }
+            Config::getInstance()->config['access']['only_public_channels'] = false;
+            self::assertSame(200, $this->handle($client, $this->request(channel: $peer, query: '?limit=1'))->getStatus());
+        }
+        foreach (array_keys($entities) as $peer) {
+            if ($peer === 'alice') {
+                continue;
+            }
+            self::assertSame((string) $peer, $client->getMessage((string) $peer, 7)['message']);
+        }
+        self::assertSame(5, $api->count('getHistoryHtml'));
+        self::assertSame(0, $api->count('getMessages'));
+        self::assertSame(0, $api->count('getInfo'));
+    }
+
+    public function testStandaloneMessageRefreshDoesNotReplaceHistoryHtmlWithRawText(): void
+    {
+        [$clock, , $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api) {
+            $history = $api->history($p['data']);
+            foreach ($history['messages'] as &$message) {
+                $message['message'] = '<b>formatted</b>';
+            }
+            return $api->response($r, $history);
+        };
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 50]);
+        $clock->time = 1900;
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 1]);
+        $clock->time = 1901;
+        $api->handlers['getMessages'] = fn ($r) => $api->response($r, ['messages' => [
+            array_replace($api->message(853), ['message' => 'formatted']),
+        ]]);
+        self::assertSame('formatted', $client->getMessage('test', 853)['message']);
+        $page = $client->getHistoryHtml(['peer' => 'test', 'limit' => 1, 'add_offset' => 49]);
+        self::assertSame('<b>formatted</b>', $page['messages'][0]['message']);
+        self::assertSame(3, $api->count('getHistoryHtml'));
+    }
+
+    public function testHeadGrowsAndCompatibleShortRefreshKeepsOrderWithoutRefreshingTheTail(): void
+    {
+        [$clock, $cache, $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api) {
+            $history = $api->history($p['data']);
+            $history['users'] = [['_' => 'user', 'id' => 1, 'first_name' => 'Head']];
+            $history['chats'] = [['_' => 'channel', 'id' => 123, 'title' => 'Head']];
+            if ($p['data']['limit'] > 10) {
+                $history['users'][] = ['_' => 'user', 'id' => 2, 'first_name' => 'Tail'];
+                $history['chats'][] = ['_' => 'channel', 'id' => 456, 'title' => 'Tail'];
+            }
+            return $api->response($r, $history);
+        };
+        self::assertCount(10, $client->getHistoryHtml(['peer' => 'test'])['messages']);
+        $fifty = $client->getHistoryHtml(['peer' => 'test', 'limit' => 50]);
+        self::assertCount(50, $fifty['messages']);
+        $client->getHistoryHtml(['peer' => '@TEST']);
+        self::assertSame(2, $api->count('getHistoryHtml'));
+        $clock->time += 60;
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 10]);
+        $context = new CacheContext(60);
+        $context->readMode = CacheReadMode::Stale;
+        $older = $client->getHistoryHtml(['peer' => 'test', 'limit' => 50], $context);
+        self::assertSame(array_column($fifty['messages'], 'id'), array_column($older['messages'], 'id'));
+        self::assertEquals($fifty['users'], $older['users']);
+        self::assertEquals($fifty['chats'], $older['chats']);
+        self::assertSame([CacheStatus::STALE, 1000.0], [$context->status, $context->loadedAt]);
+        self::assertSame(3, $api->count('getHistoryHtml'));
+        $api->handlers['getInfo'] = fn ($r) => $api->response($r, [
+            'User' => ['_' => 'user', 'id' => 2, 'first_name' => 'Changed'], 'type' => 'user', 'bot_api_id' => 2,
+        ]);
+        $client->getInfo('2', 'test');
+        $updated = $client->getHistoryHtml(['peer' => 'test', 'limit' => 50], $context);
+        self::assertSame('Changed', array_column($updated['users'], 'first_name', 'id')[2]);
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 50]);
+        self::assertSame(4, $api->count('getHistoryHtml'));
+        foreach ($fifty['messages'] as $message) {
+            self::assertSame($message, $client->getMessage('test', $message['id']));
+        }
+        self::assertSame(0, $api->count('getMessages'));
+        self::assertSame(1, $cache->stats()->channels);
+    }
+
+    public function testConflictingShortHeadDropsTheOldOrderButKeepsMessagesForMedia(): void
+    {
+        [$clock, , $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data']));
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 50]);
+        $clock->time += 60;
+        $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api) {
+            $history = $api->history($p['data']);
+            $history['messages'][0] = $api->message(2000);
+            return $api->response($r, $history);
+        };
+        self::assertSame(2000, $client->getHistoryHtml(['peer' => 'test'])['messages'][0]['id']);
+        self::assertSame(970, $client->getMessage('test', 970)['id']);
+        $context = new CacheContext(60);
+        $context->readMode = CacheReadMode::Stale;
+        self::assertCount(50, $client->getHistoryHtml(['peer' => 'test', 'limit' => 50], $context)['messages']);
+        self::assertSame(3, $api->count('getHistoryHtml'));
+        self::assertSame(0, $api->count('getMessages'));
+    }
+
+    public function testHistorySeedsInfoAndResponsesAreRenderedFromSharedEntities(): void
+    {
+        [, , $api, $client] = $this->createClient();
+        $api->handlers['getHistoryHtml'] = function ($r) use ($api) {
+            $message = $api->message(7);
+            $message['peer_id'] = -1000000000123;
+            return $api->response($r, [
+                'messages' => [$message], 'count' => 1,
+                'chats' => [
+                    ['_' => 'channel', 'id' => 999, 'username' => 'other', 'title' => 'Unrelated chat'],
+                    ['_' => 'channel', 'id' => -1000000000123, 'username' => 'TeSt', 'title' => 'From history'],
+                ],
+            ]);
+        };
+        $client->getHistoryHtml(['peer' => '@TEST']);
+        self::assertSame('From history', $client->getInfo('test')['Chat']['title']);
+        self::assertSame(0, $api->count('getInfo'));
+        $first = $this->handle($client, $this->request('rss'), 'rss');
+        $body = buffer($first->getBody());
+        $count = count($api->calls);
+        Config::getInstance()->config['url'] = 'https://changed.example';
+        $next = buffer($this->handle($client, $this->request('rss'), 'rss')->getBody());
+        self::assertNotSame($body, $next);
+        self::assertStringContainsString('https://changed.example', $next);
+        self::assertSame($count, count($api->calls));
+        self::assertSame(1, $api->count('getFullInfo'));
+    }
 
     public function testFeedsShareCacheAcrossFormatsIPsAndChannelAliasesUntilExpiry(): void
     {
@@ -273,38 +431,33 @@ final class TelegramCacheTest extends TestCase
 
     public function testLeastRecentlyUsedChannelIsEvictedTogetherAtTheConfiguredLimit(): void
     {
-        $cache = new TelegramCache(maxChannels: 2);
-        $load = fn (string $value) => fn () => $this->cacheResult($cache, $value);
-        $cache->get('a', $load('a'));
-        $cache->get('b', $load('b'));
-        $cache->get('a', $load('unexpected'));
-        $cache->put('message:a:7', ['id' => 7], $cache->now(), 'getMessages');
-        $cache->get('c', $load('c'));
-        self::assertSame('a', $cache->get('a', $load('unexpected'))->value);
-        self::assertSame(['id' => 7], $cache->getCached('message:a:7')->value);
-        self::assertSame('reloaded', $cache->get('b', $load('reloaded'))->value);
-        self::assertNull($cache->getCached('c'));
+        [, $cache, $api, $client] = $this->createClient(maxChannels: 2);
+        $client->getHistoryHtml(['peer' => 'a']);
+        $client->getMessage('b', 7);
+        $client->getMessage('a', 7);
+        $client->getMessage('c', 7);
+        self::assertSame(7, $client->getMessage('a', 7)['id']);
+        self::assertSame(2, $api->count('getMessages'));
+        $client->getMessage('b', 7);
+        self::assertSame(3, $api->count('getMessages'));
+        self::assertNull($cache->peer('c')->messages[7] ?? null);
+        self::assertNotNull($cache->peer('a')->history);
     }
 
-    public function testDefaultsKeepTenMessagesAndAtMostFiveHundredChannels(): void
+    public function testDefaultsKeepAtMostFiveHundredChannels(): void
     {
-        foreach (['CACHE_MAX_CHANNELS', 'CACHE_HISTORY_WINDOW_SIZE'] as $name) {
-            putenv($name);
-        }
+        putenv('CACHE_MAX_CHANNELS');
         $config = (include ROOT_DIR . '/config.php')['cache'];
-        self::assertSame([500, 10], [$config['maxChannels'], $config['historyWindowSize']]);
-        $clock = new Clock();
-        $cache = new TelegramCache(clock: fn () => $clock->time);
-        $api = new ApiFixture();
-        $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
-        $client->getHistoryHtml(['peer' => 'test']);
-        self::assertSame(10, $api->calls[0]['params']['data']['limit']);
+        self::assertSame(500, $config['maxChannels']);
+        $cache = new TelegramCache();
         foreach (range(1, 501) as $channel) {
-            $cache->put('history:channel' . $channel . ':window', [], $cache->now(), 'history');
+            $peer = $cache->peer('channel' . $channel);
+            $peer->messages[7] = CacheEntry::pack(['id' => 7], $cache->now(), 'getMessages');
+            $cache->commit('channel' . $channel, $peer);
         }
-        self::assertSame(500, $cache->stats()['channels']);
-        self::assertNull($cache->getCached('history:channel1:window'));
-        self::assertNotNull($cache->getCached('history:channel501:window'));
+        self::assertSame(500, $cache->stats()->channels);
+        self::assertNull($cache->read($cache->peer('channel1')->messages[7] ?? null));
+        self::assertNotNull($cache->read($cache->peer('channel501')->messages[7] ?? null));
     }
 
     public function testQuotaIncludesCacheHitsAndRejectedRequestsDoNotExtendIt(): void
@@ -373,27 +526,6 @@ final class TelegramCacheTest extends TestCase
         self::assertSame($count, count($api->calls));
     }
 
-    public function testPartialHistoryCannotUseOldFeedAsFallbackForConcurrentRequests(): void
-    {
-        [$clock, , $api, $client] = $this->createClient();
-        $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data']));
-        $query = '?limit=30&page=3';
-        $this->handle($client, $this->request(query: $query));
-        $clock->time += 60;
-        $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api) {
-            delay(0.01);
-            return $p['data']['limit'] === 100
-                ? $api->response($r, $api->history(array_replace($p['data'], ['limit' => 20])))
-                : $api->error($r, 'FLOOD_WAIT_1000');
-        };
-        $responses = await([async(fn () => $this->handle($client, $this->request(query: $query))),
-            async(fn () => $this->handle($client, $this->request(query: $query)))]);
-        foreach ($responses as $response) {
-            self::assertSame([429, '1000'], [$response->getStatus(), $response->getHeader('Retry-After')]);
-        }
-        self::assertSame(3, $api->count('getHistoryHtml'));
-    }
-
     public function testSlowFeedRenderingDoesNotExtendTheHistoryTTL(): void
     {
         [$clock, , $api, $client] = $this->createClient();
@@ -412,6 +544,7 @@ final class TelegramCacheTest extends TestCase
     {
         [$clock, $cache, $api, $client] = $this->createClient();
         $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data']));
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 100]);
         foreach ([['', 0, 10], ['?limit=20', 0, 20], ['?page=10', 90, 10], ['?limit=30&page=3', 60, 30]] as [$query, $offset, $limit]) {
             $response = $this->handle($client, $this->request('json', '@TEST', $query));
             self::assertSame($api->history(['limit' => $limit, 'add_offset' => $offset, 'offset_id' => 0]) + ['sponsored_messages' => []], json_decode(buffer($response->getBody()), true));
@@ -451,6 +584,7 @@ final class TelegramCacheTest extends TestCase
             $body = buffer($first->getBody());
             self::assertSame($ids, array_column(json_decode($body, true)['messages'], 'id'));
             self::assertSame($body, buffer($second->getBody()));
+            self::assertSame('TelegramRSS; fwd=bypass', $second->getHeader('Cache-Status'));
             self::assertSame($before + 2, $api->count('getHistoryHtml'));
         }
         $this->handle($client, $this->request());
@@ -460,23 +594,24 @@ final class TelegramCacheTest extends TestCase
         self::assertSame(429, $this->handle($client, $this->request('rss', query: '?id=700'), 'rss')->getStatus());
     }
 
-    public function testDifferentLimitsPagesFormatsCoalesceOnTheSameHeadSnapshot(): void
+    public function testIdenticalHeadQueriesCoalesceAcrossFormatsAndLargerQueriesLoadTheirOwnRange(): void
     {
-        [$clock, $cache, $api, $client] = $this->createClient();
+        [, , $api, $client] = $this->createClient();
         $api->handlers['getHistoryHtml'] = function ($r, $p) use ($api) {
             delay(0.01);
             return $api->response($r, $api->history($p['data']));
         };
-        $futures = [];
-        foreach ([['json', '?limit=1'], ['json', '?page=10'], ['rss', '?limit=3'], ['json', '?limit=30&page=3']] as [$format, $query]) {
-            $futures[] = async(fn () => $this->handle($client, $this->request($format, query: $query), $format));
-        }
-        $responses = await($futures);
-        foreach ($responses as $response) {
-            self::assertSame(200, $response->getStatus());
-        }
-        self::assertSame([730, 727, 724, 721, 718, 715, 712, 709, 706, 703], array_column(json_decode(buffer($responses[1]->getBody()), true)['messages'], 'id'));
-        self::assertSame(1, $api->count('getHistoryHtml'));
+        $responses = await([
+            async(fn () => $this->handle($client, $this->request(query: '?limit=10'))),
+            async(fn () => $this->handle($client, $this->request('rss', '@TEST', '?limit=10'), 'rss')),
+            async(fn () => $this->handle($client, $this->request(query: '?limit=50'))),
+        ]);
+        self::assertSame([200, 200, 200], array_map(fn ($response) => $response->getStatus(), $responses));
+        self::assertCount(50, json_decode(buffer($responses[2]->getBody()), true)['messages']);
+        self::assertSame(2, $api->count('getHistoryHtml'));
+        $limits = array_map(fn ($call) => $call['params']['data']['limit'], array_filter($api->calls, fn ($call) => $call['method'] === 'getHistoryHtml'));
+        sort($limits);
+        self::assertSame([10, 50], $limits);
     }
 
     public function testConcurrentOldPagesShareOnlyTheInFlightLoadAndRecoverAfterFloodWait(): void
@@ -520,42 +655,15 @@ final class TelegramCacheTest extends TestCase
                     self::assertCount($expected, json_decode(buffer($response->getBody()), true)['messages']);
                 }
             }
-            self::assertSame(5, $api->count('getHistoryHtml'));
+            self::assertSame(3, $api->count('getHistoryHtml'));
         }
         [, , $api, $client] = $this->createClient();
         $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data'], 12));
+        $client->getHistoryHtml(['peer' => 'test', 'limit' => 100]);
         $page = json_decode(buffer($this->handle($client, $this->request(query: '?page=2'))->getBody()), true);
         self::assertSame([970, 967], array_column($page['messages'], 'id'));
         self::assertSame([], json_decode(buffer($this->handle($client, $this->request(query: '?page=3'))->getBody()), true)['messages']);
         self::assertSame(1, $api->count('getHistoryHtml'));
-    }
-
-    public function testConfiguredHeadSizeChangesCoverageDisabledCacheRetainsOriginalRequestSize(): void
-    {
-        putenv('CACHE_ENABLED=1');
-        putenv('CACHE_HISTORY_WINDOW_SIZE=25');
-        Config::getInstance()->config['cache'] = (include ROOT_DIR . '/config.php')['cache'];
-        $api = new ApiFixture();
-        $api->handlers['getHistoryHtml'] = fn ($r, $p) => $api->response($r, $api->history($p['data']));
-        $client = new TgClient('fake.test', 9503, httpClient: $this->createApiClient($api));
-        $this->handle($client, $this->request());
-        $this->handle($client, $this->request(query: '?limit=5&page=5'));
-        self::assertSame(1, $api->count('getHistoryHtml'));
-        $this->handle($client, $this->request(query: '?limit=10&page=3'));
-        $this->handle($client, $this->request(query: '?limit=10&page=3'));
-        self::assertSame(3, $api->count('getHistoryHtml'));
-        $calls = array_values(array_filter($api->calls, fn ($call) => $call['method'] === 'getHistoryHtml'));
-        self::assertSame(25, $calls[0]['params']['data']['limit']);
-        self::assertSame(10, $calls[1]['params']['data']['limit']);
-        self::assertSame(20, $calls[1]['params']['data']['add_offset']);
-        putenv('CACHE_ENABLED=0');
-        Config::getInstance()->config['cache'] = (include ROOT_DIR . '/config.php')['cache'];
-        $api = new ApiFixture();
-        $client = new TgClient('fake.test', 9503, httpClient: $this->createApiClient($api));
-        $this->handle($client, $this->request(query: '?limit=3&page=2'));
-        $calls = array_values(array_filter($api->calls, fn ($call) => $call['method'] === 'getHistoryHtml'));
-        self::assertSame(3, $calls[0]['params']['data']['limit']);
-        self::assertSame(3, $calls[0]['params']['data']['add_offset']);
     }
 
     public function testPeerPauseCoversAllMethodsAndAliasesButNotOtherChannels(): void
@@ -638,7 +746,7 @@ final class TelegramCacheTest extends TestCase
             ));
         }
         self::assertSame(0, $api->count('getMessages'));
-        self::assertSame(3, $cache->stats()['channels']);
+        self::assertSame(3, $cache->stats()->channels);
     }
 
     public function testAsyncMediaMetadataAttributesFLOODWAITToTheFeedPeerAndWarmFallbackKeepsItsAge(): void
@@ -740,22 +848,12 @@ final class TelegramCacheTest extends TestCase
     }
 
     /**
-     * @template T
-     * @param T $value
-     * @return CacheResult<T>
-     */
-    private function cacheResult(TelegramCache $cache, mixed $value): CacheResult
-    {
-        return new CacheResult($value, $cache->now(), 'api', CacheStatus::MISS);
-    }
-
-    /**
      * @return array{Clock, TelegramCache, ApiFixture, TgClient}
      */
-    private function createClient(bool $enabled = true): array
+    private function createClient(bool $enabled = true, int $maxChannels = 500): array
     {
         $clock = new Clock();
-        $cache = new TelegramCache($enabled, clock: fn () => $clock->time, historyWindowSize: 100);
+        $cache = new TelegramCache($enabled, $maxChannels, clock: fn () => $clock->time);
         $api = new ApiFixture();
         $client = new TgClient('fake.test', 9503, cache: $cache, httpClient: $this->createApiClient($api));
         return [$clock, $cache, $api, $client];

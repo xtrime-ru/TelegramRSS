@@ -20,6 +20,9 @@ use TelegramRSS\Cache\TelegramCache;
 use TelegramRSS\Cache\CacheContext;
 use TelegramRSS\Cache\CacheStatus;
 use TelegramRSS\Cache\CacheResult;
+use TelegramRSS\Cache\CacheEntry;
+use TelegramRSS\Cache\PeerCache;
+use TelegramRSS\Cache\CacheReadMode;
 use UnexpectedValueException;
 
 use function Amp\async;
@@ -94,88 +97,42 @@ class TgClient
         );
         $data['peer'] = TelegramCache::normalizeChannel((string) $data['peer']);
         ksort($data);
-        if (!$this->usesHistoryWindow($data) || $context?->cacheResponse === false) {
-            return $this->historyResponse($this->loadHistory($data, false, $context, cancellation: $cancellation), $context);
-        }
-
-        $window = $data;
-        $window['limit'] = $this->cache->historyWindowSize;
-        $window['add_offset'] = 0;
-        $window['hash'] = [];
-        $result = $this->loadHistory($window, true, $context, cancellation: $cancellation);
-        $history = $result->value;
-        $messages = $history['messages'] ?? [];
-        $covered = count($messages) >= $data['add_offset'] + $data['limit'];
-        $atEnd = isset($history['count']) && $history['count'] <= count($messages);
-        if (!$covered && !$atEnd) {
-            // A partial snapshot cannot answer this range. Do not cache the feed or use stale fallback.
-            $context?->bypassResponseCache();
-            if ($data === $window && in_array($result->status, [CacheStatus::MISS, CacheStatus::COALESCED], true)) {
-                // This fresh load already used the exact original query; do not repeat it.
-                return $this->historyResponse($result->withStatus(CacheStatus::BYPASS), $context);
+        $cacheable = !$context?->bypassHistory && $this->usesHistoryWindow($data);
+        $store = $cacheable && $data['add_offset'] === 0;
+        $loader = function (Cancellation $shared) use ($data, $store): CacheResult {
+            $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data], cancellation: $shared), cancellation: $shared);
+            $shared->throwIfRequested();
+            $loadedAt = $this->cache->now();
+            if ($store) {
+                $peer = $this->cache->peer($data['peer']);
+                $peer->updateHistory($data['peer'], $history, $loadedAt, $data['limit']);
+                $this->cache->commit($data['peer'], $peer);
             }
-            return $this->historyResponse($this->loadHistory($data, false, $context, cancellation: $cancellation), $context);
-        }
-        $history['messages'] = array_slice($messages, (int) $data['add_offset'], (int) $data['limit']);
-        return $this->historyResponse($result, $context, $history);
-    }
-
-    /**
-     * @param HistoryQuery $data
-     */
-    public function usesHistoryWindow(array $data): bool
-    {
-        $limit = $data['limit'] ?? 10;
-        $offset = $data['add_offset'] ?? 0;
-        return $this->cache->enabled && $limit > 0 && $offset >= 0
-            && $offset <= $this->cache->historyWindowSize - $limit
-            && ($data['offset_id'] ?? 0) == 0 && ($data['offset_date'] ?? 0) == 0
-            && ($data['max_id'] ?? 0) == 0 && ($data['min_id'] ?? 0) == 0
-            && ($data['hash'] ?? []) === [];
-    }
-
-    /**
-     * @param HistoryQuery $data
-     * @return CacheResult<History>
-     */
-    private function loadHistory(array $data, bool $cacheable, ?CacheContext $context, ?Cancellation $cancellation = null): CacheResult
-    {
-        if (!$cacheable) {
-            $context?->bypassResponseCache();
-        }
-        // Keep cached and bypassed loads separate, even when their API parameters match.
-        $key = self::historyCacheKey($data, $cacheable);
-        return $this->cache->get(
-            $key,
-            /** @return CacheResult<History> */
-            function (Cancellation $cancellation) use ($data, $cacheable): CacheResult {
-                /** @var History $history */
-                $history = self::getArrayContents($this->get('getHistoryHtml', $data['peer'], ['data' => $data], cancellation: $cancellation), cancellation: $cancellation);
-                $loadedAt = $this->cache->now();
-                return new CacheResult($history, $loadedAt, 'history', $cacheable ? CacheStatus::MISS : CacheStatus::BYPASS);
-            },
-            cancellation: $cancellation,
+            return new CacheResult($history, $loadedAt, 'history', $store ? CacheStatus::MISS : CacheStatus::BYPASS);
+        };
+        $result = $this->cache->resolve(
+            fn (bool $stale) => $cacheable ? $this->cache->history($data['peer'], $data['limit'], $data['add_offset'], $stale) : null,
+            fn (Cancellation $shared) => $store
+                ? $this->cache->fetch('history:' . $data['peer'] . ':' . $data['limit'], $loader, $shared)
+                : $this->cache->fetch('history:bypass:' . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR)), $loader, $shared),
+            $cacheable ? ($context?->readMode ?? CacheReadMode::Fresh) : CacheReadMode::Fresh,
+            $cancellation,
         );
+        $context?->observe($result);
+        return $result->value;
     }
 
     /** @param HistoryQuery $data */
-    private static function historyCacheKey(array $data, bool $cacheable): string
+    private function usesHistoryWindow(array $data): bool
     {
-        ksort($data);
-        return 'history:' . $data['peer'] . ':' . ($cacheable
-            ? 'window'
-            : 'bypass:' . hash('sha256', json_encode($data, JSON_THROW_ON_ERROR)));
-    }
-
-    /**
-     * @param CacheResult<History> $result
-     * @param History|null $history
-     * @return History
-     */
-    private function historyResponse(CacheResult $result, ?CacheContext $context, ?array $history = null): array
-    {
-        $context?->observe($result);
-        return $history ?? $result->value;
+        $limit = $data['limit'] ?? 10;
+        $offset = $data['add_offset'] ?? 0;
+        $peer = TelegramCache::normalizeChannel((string) ($data['peer'] ?? ''));
+        return $this->cache->enabled && $limit > 0 && $limit <= 100 && $offset >= 0
+            && ($offset === 0 || $this->cache->hasHistoryRange($peer, $offset, $limit))
+            && ($data['offset_id'] ?? 0) == 0 && ($data['offset_date'] ?? 0) == 0
+            && ($data['max_id'] ?? 0) == 0 && ($data['min_id'] ?? 0) == 0
+            && ($data['hash'] ?? []) === [];
     }
 
     public function getCache(): TelegramCache
@@ -190,28 +147,24 @@ class TgClient
     {
         $cancellation?->throwIfRequested();
         $peer = TelegramCache::normalizeChannel($peer);
-        $key = 'message:' . $peer . ':' . $id;
-        /** @var CacheResult<Message>|null $result */
-        $result = $this->cache->getCached($key, useStale: true);
-        /** @var CacheResult<History>|null $history */
-        $history = $this->cache->getCached(self::historyCacheKey(['peer' => $peer], true), useStale: true);
-        if ($history && (!$result || $history->loadedAt > $result->loadedAt)) {
-            $message = self::findMessage($history->value['messages'] ?? [], $id);
-            if ($message !== null) {
-                $result = new CacheResult($message, $history->loadedAt, 'history', $history->status);
-            }
-        }
-        $result ??= $this->cache->get(
-            $key,
-            /** @return CacheResult<Message> */
-            function (Cancellation $cancellation) use ($peer, $id): CacheResult {
-                $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]], cancellation: $cancellation), cancellation: $cancellation);
-                $message = self::findMessage($data['messages'] ?? [], $id)
-                    ?? throw new UnexpectedValueException('Empty message', 400);
-                return new CacheResult($message, $this->cache->now(), 'getMessages', CacheStatus::MISS);
-            },
-            useStale: true,
-            cancellation: $cancellation,
+        $result = $this->cache->resolve(
+            fn (bool $stale) => $this->cache->read($this->cache->peer($peer)->messages[$id] ?? null, $stale),
+            fn (Cancellation $shared) => $this->cache->fetch('message:' . $peer . ':' . $id,
+                function (Cancellation $shared) use ($peer, $id): CacheResult {
+                    $data = self::getArrayContents($this->get('getMessages', $peer, ['peer' => $peer, 'id' => [$id]], cancellation: $shared), cancellation: $shared);
+                    $message = self::findMessage($data['messages'] ?? [], $id)
+                        ?? throw new UnexpectedValueException('Empty message', 400);
+                    $shared->throwIfRequested();
+                    $loadedAt = $this->cache->now();
+                    if ($this->cache->enabled) {
+                        $state = $this->cache->peer($peer);
+                        $state->messages[$id] = CacheEntry::newer($state->messages[$id] ?? null, $message, $loadedAt, 'getMessages');
+                        $this->cache->commit($peer, $state);
+                    }
+                    return new CacheResult($message, $loadedAt, 'getMessages', CacheStatus::MISS);
+                }, $shared),
+            CacheReadMode::Stale,
+            $cancellation,
         );
         if ($context !== null) {
             $context->observe($result);
@@ -275,9 +228,15 @@ class TgClient
      * @param array<string, mixed> $message
      * @return array{size?: int, mime?: string, name?: string, ext?: string, ...}
      */
-    public function getMediaInfo(array $message, string $peer, ?Cancellation $cancellation = null): array
+    public function getMediaInfo(array $message, string $peer, ?Cancellation $cancellation = null, ?CacheContext $context = null): array
     {
-        return self::getArrayContents($this->get('getDownloadInfo', $peer, ['message' => $message], cancellation: $cancellation), cancellation: $cancellation);
+        $peer = TelegramCache::normalizeChannel($peer);
+        $hash = hash('sha256', json_encode($message, JSON_THROW_ON_ERROR));
+        return $this->cachedData($peer, 'download:' . $peer . ':' . $hash,
+            static fn (PeerCache $state) => $state->downloads[$hash] ?? null,
+            static fn (PeerCache $state, CacheEntry $entry) => $state->downloads[$hash] = $entry,
+            fn (Cancellation $shared) => self::getArrayContents($this->get('getDownloadInfo', $peer, ['message' => $message], cancellation: $shared), cancellation: $shared),
+            $context, $cancellation);
     }
 
     /**
@@ -286,25 +245,34 @@ class TgClient
     public function getInfo(string $peer, ?string $requestPeer = null, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
     {
         $cancellation?->throwIfRequested();
-        $requestPeer ??= $peer;
-        // Icons and calls outside cached routes keep their existing behaviour.
-        if ($context === null) {
-            return self::getArrayContents($this->get('getInfo', $requestPeer, $peer, cancellation: $cancellation), cancellation: $cancellation);
-        }
+        $requestPeer = TelegramCache::normalizeChannel($requestPeer ?? $peer);
         $peer = TelegramCache::normalizeChannel($peer);
-        $result = $this->cache->get('info:' . $peer,
-            fn (Cancellation $cancellation) => new CacheResult(self::getArrayContents($this->get('getInfo', $requestPeer, $peer, cancellation: $cancellation), cancellation: $cancellation),
-                $this->cache->now(), 'api', CacheStatus::MISS), cancellation: $cancellation);
-        $context?->observe($result);
-        return $result->value;
+        $main = $peer === $requestPeer;
+        return $this->cachedData($requestPeer, 'info:' . $requestPeer . ':' . $peer,
+            static fn (PeerCache $state) => $main ? $state->info : $state->peerInfo($peer),
+            static function (PeerCache $state, CacheEntry $entry) use ($main, $peer): void {
+                if ($main || (string) $state->infoId === $peer) {
+                    $state->info = $entry;
+                    $state->infoId = $entry->unpack()['bot_api_id'] ?? $state->infoId;
+                } else {
+                    $state->relatedInfo[$peer] = $entry;
+                }
+            },
+            fn (Cancellation $shared) => self::getArrayContents($this->get('getInfo', $requestPeer, $peer, cancellation: $shared), cancellation: $shared),
+            $context, $cancellation);
     }
 
     /**
      * @return array{Chat?: array{title?: string, ...}, full?: array{about?: string, ...}, ...}
      */
-    public function getFullInfo(string $peer, ?Cancellation $cancellation = null): array
+    public function getFullInfo(string $peer, ?Cancellation $cancellation = null, ?CacheContext $context = null): array
     {
-        return self::getArrayContents($this->get('getFullInfo', $peer, $peer, cancellation: $cancellation), cancellation: $cancellation);
+        $peer = TelegramCache::normalizeChannel($peer);
+        return $this->cachedData($peer, 'fullInfo:' . $peer,
+            static fn (PeerCache $state) => $state->fullInfo,
+            static fn (PeerCache $state, CacheEntry $entry) => $state->fullInfo = $entry,
+            fn (Cancellation $shared) => self::getArrayContents($this->get('getFullInfo', $peer, $peer, cancellation: $shared), cancellation: $shared),
+            $context, $cancellation);
     }
 
     /**
@@ -335,6 +303,46 @@ class TgClient
      * @return list<array<string, mixed>>
      */
     public function getSponsoredMessages(string $peer, ?CacheContext $context = null, ?Cancellation $cancellation = null): array
+    {
+        $peer = TelegramCache::normalizeChannel($peer);
+        return $this->cachedData($peer, 'sponsored:' . $peer,
+            static fn (PeerCache $state) => $state->sponsored,
+            static fn (PeerCache $state, CacheEntry $entry) => $state->sponsored = $entry,
+            fn (Cancellation $shared) => $this->loadSponsoredMessages($peer, $context, $shared), $context, $cancellation);
+    }
+
+    /**
+     * @template T of array
+     * @param \Closure(PeerCache): ?CacheEntry<T> $read
+     * @param \Closure(PeerCache, CacheEntry<T>): mixed $write
+     * @param \Closure(Cancellation): T $loader
+     * @return T
+     */
+    private function cachedData(string $peer, string $key, \Closure $read, \Closure $write, \Closure $loader, ?CacheContext $context, ?Cancellation $cancellation): array
+    {
+        $result = $this->cache->resolve(
+            fn (bool $stale) => $this->cache->read($read($this->cache->peer($peer)), $stale),
+            fn (Cancellation $shared) => $this->cache->fetch($key,
+                function (Cancellation $shared) use ($peer, $read, $write, $loader): CacheResult {
+                    $value = $loader($shared);
+                    $shared->throwIfRequested();
+                    $loadedAt = $this->cache->now();
+                    if ($this->cache->enabled) {
+                        $state = $this->cache->peer($peer);
+                        $write($state, CacheEntry::newer($read($state), $value, $loadedAt, 'api'));
+                        $this->cache->commit($peer, $state);
+                    }
+                    return new CacheResult($value, $loadedAt, 'api', CacheStatus::MISS);
+                }, $shared),
+            $context?->readMode ?? CacheReadMode::Fresh,
+            $cancellation,
+        );
+        $context?->observe($result);
+        return $result->value;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function loadSponsoredMessages(string $peer, ?CacheContext $context, ?Cancellation $cancellation): array
     {
         $cancellation?->throwIfRequested();
         if ($this->isPremium === null) {

@@ -18,6 +18,7 @@
         "amphp/http-client": "^5",
         "amphp/http-server-static-content": ">=2",
         "amphp/file": "^4",
+        "amphp/pipeline": "^1",
         "amphp/http": "^2",
         "vlucas/phpdotenv": "^5",
         "ext-json": "*",
@@ -28,6 +29,9 @@
         "symfony/rate-limiter": ">=6.4",
         "symfony/cache": ">=6.4",
         "cweagans/composer-patches": "^2.0"
+    },
+    "suggest": {
+        "ext-zstd": "Optional cache compression, version >=0.18"
     },
     "prefer-stable": true,
     "minimum-stability": "dev",

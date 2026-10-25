@@ -9,7 +9,7 @@ Get posts from my [TelegramApiServer](https://github.com/xtrime-ru/TelegramApiSe
 * Get any public telegram posts from groups as json or RSS
 * fail2ban, per-client request limits, IP blacklist
 * Full media support. Access any media from messages via direct links.
-* Shared feed/history cache and media-message reuse across clients
+* Shared compressed channel data and media-message reuse across clients
 
 The current dependencies require PHP 8.4.1+.
 
@@ -43,53 +43,57 @@ requests; rejected requests are excluded.
 
 ## Shared cache
 
-Caching is enabled by default and shared across clients. Successful results
-are reused for 60 seconds, regardless of request frequency. Cache hits never
-extend data freshness; edits and deletions may remain invisible until refresh.
-Access rules and client quotas apply to cached responses too.
+Caching is enabled by default and shared across clients. It stores data for
+channels, groups and private dialogs:
+messages, peer information, full information and metadata needed to render
+feeds. Ready RSS/JSON responses and file bytes are not stored. When optional
+`ext-zstd >=0.18` is available, payloads use zstd level 1, each message separately.
+Without it, the same data is stored as uncompressed JSON. No configuration is needed.
 
 Configure caching in `.env` or `.env.docker` and restart:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CACHE_ENABLED` | `1` | Enable caching; `0` disables it |
-| `CACHE_MAX_CHANNELS` | `500` | Maximum channels; `0` disables storage |
+| `CACHE_MAX_CHANNELS` | `500` | Maximum peers (channels/groups/dialogs); `0` disables storage |
 | `CACHE_TTL_SECONDS` | `60` | Freshness period; `0` disables fresh reuse |
-| `CACHE_HISTORY_WINDOW_SIZE` | `10` | Latest messages shared across feeds; range 1–100 |
-| `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale feeds and media messages; `0` disables stale reuse |
+| `CACHE_STALE_TTL_SECONDS` | `900` | Maximum age of stale peer data; `0` disables stale reuse |
 
-Limits and TTLs must be non-negative. Each process has its own cache. A JSONL
-snapshot in `cache/telegram-cache.jsonl` is saved on graceful shutdown and restored
-at startup, preserving data age, LRU order and active FLOOD_WAIT pauses. Downtime counts toward TTLs.
-Expired records are skipped; changed limits apply on restore. Changing the history
-window discards saved results. Snapshot errors are logged without preventing
-startup; failed saves preserve the previous file. Forced termination (SIGKILL)
-cannot save a new snapshot. `CACHE_ENABLED=0` disables snapshot reads and writes.
-Least recently used channels are evicted as a whole, including their history,
-messages, metadata and ready feeds. `CACHE_MAX_CHANNELS` replaces
-`CACHE_MAX_ENTRIES`; there is no byte limit. Old snapshots are discarded when
-the storage format or history window changes.
+History loads exactly the requested number of messages. A request for 10 and
+then 50 messages retains 50, shared between RSS, JSON and media. A shorter refresh
+preserves the longer order when the received prefix agrees; a conflicting head
+replaces the order. Only received messages become fresh. Cache hits never extend
+freshness. Old messages remain available for media until expiry or eviction.
+Peer information
+from history also serves information lookups, without storing a second copy.
+Pagination within the retained window reuses it; anchored requests and pages
+outside it bypass history caching. Channel names are case-insensitive and an
+initial `@`, client IP or unused parameters do not create separate entries.
 
-RSS and JSON, different limits and pages reuse the latest messages of a channel.
-Requests outside this window, with `id`, or not covered by the available history
-are fetched directly and have no stale feed fallback. Channel names are
-case-insensitive; an initial `@`, client IP and unused parameters such as `_cb`
-do not create separate channel histories.
+Each process has its own cache. Least recently used peers are evicted as a whole.
+There is no byte limit or separate limit on messages within a peer;
+expired entries are cleaned when the peer is updated. Access rules and client
+quotas apply before cache reuse. Groups and private dialogs still require
+`ONLY_PUBLIC_CHANNELS=0`.
 
-Media first looks for the message in the channel history and previous media
-lookups, including stale data up to `CACHE_STALE_TTL_SECONDS` old. Only a missing
-or expired message requires an API lookup. History messages are not duplicated
-as separate cache entries; standalone media lookups are stored separately.
-Original files, previews and Range requests each get their own download stream.
-File bytes and icons are not cached.
+A snapshot is streamed on graceful shutdown and restored at startup. With zstd,
+`cache/telegram-cache.jsonl.zst` is compressed without building a full file in
+memory; otherwise `cache/telegram-cache.jsonl` is written. With the extension,
+either format can be read; without it, compressed snapshots are skipped. A
+successful save replaces the previous format. Data age, history order and active FLOOD_WAIT pauses
+survive restarts; downtime counts toward TTLs. Changed capacity applies on
+restore. Older snapshot schemas are ignored with a notice. Failed saves preserve
+the previous file and log errors. Forced termination cannot save a new snapshot.
+`CACHE_ENABLED=0` disables snapshot reads and writes.
 
 On FLOOD_WAIT, API requests for that channel pause; other channels remain
-available. Cached feeds can still be returned. If refresh is blocked, previously
-loaded feeds may be reused for up to `CACHE_STALE_TTL_SECONDS` without extending
-their original age. Other errors do not enable stale feed fallback.
-Downloads still return HTTP 429 with `Retry-After` during the pause: a cached
-message cannot replace the file transfer. Disabling caching does not disable
-FLOOD_WAIT pauses.
+available. RSS/JSON can be rebuilt from suitable stale data without extending its
+age. Each required piece of data handles its own fallback; the request is rendered
+once. Other errors do not enable stale fallback. Media first searches for its
+message, including stale data, before calling the API. Original files, previews
+and Range requests each use an independent download stream. Downloads during a
+pause still return HTTP 429 with `Retry-After`; icons and file bytes are not cached.
+Disabling caching does not disable FLOOD_WAIT pauses.
 
 Access logs include `cache_status`, `message_source` and `cache_ttl`.
 RSS/JSON responses expose `Cache-Status`: `hit; ttl=N`, `fwd=miss`, or
