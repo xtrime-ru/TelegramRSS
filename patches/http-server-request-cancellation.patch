@@ -31,7 +31,7 @@
      ) {
          parent::__construct($method, $uri);
 
-@@ -55,6 +59,20 @@
+@@ -55,6 +59,26 @@
          if ($trailers !== null) {
              $this->setTrailers($trailers);
          }
@@ -41,6 +41,12 @@
 +    public function getCancellation(): Cancellation
 +    {
 +        return $this->cancellation;
++    }
++
++    /** Assigns cancellation to this request so the HTTP driver observes it too. */
++    public function setCancellation(Cancellation $cancellation): void
++    {
++        $this->cancellation = $cancellation;
 +    }
 +
 +    /** Returns a copy of this request with the given cancellation. */

@@ -19,6 +19,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Psr\Log\LoggerInterface;
 use TelegramRSS\Cache\TelegramCache;
 use TelegramRSS\Server\ReadAheadHttpDriverFactory;
 use TelegramRSS\TgClient;
@@ -28,6 +29,39 @@ use function Amp\async;
 #[Group('network')]
 final class RequestCancellationIntegrationTest extends TestCase
 {
+    public function testHttp1ReadSideDisconnectIsCancelledWithoutLoggingAServerError(): void
+    {
+        $started = new DeferredFuture;
+        $cancelled = new DeferredFuture;
+        $errors = [];
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('error')->willReturnCallback(static function ($message) use (&$errors): void {
+            $errors[] = $message;
+        });
+        $server = $this->server(new ClosureRequestHandler(static function (Request $request) use ($started, $cancelled): Response {
+            $started->complete();
+            try {
+                (new DeferredFuture)->getFuture()->await($request->getCancellation());
+            } catch (CancelledException $exception) {
+                $cancelled->complete();
+                throw $exception;
+            }
+            return new Response(200);
+        }), $logger);
+        $socket = \Amp\Socket\connect('tcp://' . $server->getServers()[0]->getAddress());
+        try {
+            $socket->write("GET /json/test HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            $started->getFuture()->await(new TimeoutCancellation(2));
+            $socket->end();
+            $cancelled->getFuture()->await(new TimeoutCancellation(2));
+            self::assertNull($socket->read(new TimeoutCancellation(2)));
+            self::assertSame([], $errors);
+        } finally {
+            $socket->close();
+            $server->stop();
+        }
+    }
+
     public function testLargeRequestsAndFollowingRequestsSucceed(): void
     {
         $server = $this->server(new ClosureRequestHandler(static fn (Request $request) =>
@@ -168,10 +202,11 @@ final class RequestCancellationIntegrationTest extends TestCase
         yield 'with body' => ['POST'];
     }
 
-    private function server(ClosureRequestHandler $handler): SocketHttpServer
+    private function server(ClosureRequestHandler $handler, ?LoggerInterface $logger = null): SocketHttpServer
     {
-        $factory = new ReadAheadHttpDriverFactory(new DefaultHttpDriverFactory(new NullLogger, bodySizeLimit: 300000, allowHttp2Upgrade: true));
-        $server = SocketHttpServer::createForDirectAccess(new NullLogger, httpDriverFactory: $factory);
+        $logger ??= new NullLogger;
+        $factory = new ReadAheadHttpDriverFactory(new DefaultHttpDriverFactory($logger, bodySizeLimit: 300000, allowHttp2Upgrade: true));
+        $server = SocketHttpServer::createForDirectAccess($logger, httpDriverFactory: $factory);
         $server->expose('127.0.0.1:0');
         $server->start($handler, new DefaultErrorHandler);
         return $server;

@@ -35,7 +35,7 @@ final class ReadAheadHttpDriverFactory implements HttpDriverFactory
         }
         $handler = new ClosureRequestHandler(static function (Request $request) use ($requestHandler, $disconnect) {
             if ($request->getProtocolVersion() !== '2') {
-                $request = $request->withCancellation($disconnect->getCancellation());
+                $request->setCancellation($disconnect->getCancellation());
             }
             $request->getCancellation()->throwIfRequested();
             return $requestHandler->handleRequest($request);

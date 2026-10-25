@@ -71,7 +71,7 @@
                 {
                     "description": "Expose request cancellation through getCancellation()",
                     "url": "patches/http-server-request-cancellation.patch",
-                    "sha256": "9e59a6449b0e53fd57ac127533e16b0b2607dc99e0d5b84145187f2c5a7d8143",
+                    "sha256": "693ff1956d536e4ea301898da1b3d4c566e07ce17db2cdf32b10c2e3777cfe5b",
                     "depth": 1
                 }
             ]
