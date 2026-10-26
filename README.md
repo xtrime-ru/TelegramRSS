@@ -86,6 +86,7 @@ successful save replaces the previous format. Data age, history order and active
 survive restarts; downtime counts toward TTLs. Changed capacity applies on
 restore. Older snapshot schemas are ignored with a notice. Failed saves preserve
 the previous file and log errors. Forced termination cannot save a new snapshot.
+Docker Compose allows up to two minutes for graceful shutdown and snapshot saving.
 `CACHE_ENABLED=0` disables snapshot reads and writes.
 
 On FLOOD_WAIT, API requests for that channel pause; other channels remain

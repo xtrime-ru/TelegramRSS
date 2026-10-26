@@ -3,6 +3,7 @@ services:
     image: xtrime/telegram-api-server:2
     container_name: telegram-rss
     restart: unless-stopped
+    stop_grace_period: 2m
     ports:
       - "127.0.0.1:9504:9504"
     volumes:
@@ -12,8 +13,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "1024k"
-        max-file: "2"
+        max-size: "2m" # 5 x 2 MiB = 10 MiB total.
+        max-file: "5"
 networks:
   default:
     external: true
