@@ -4,6 +4,7 @@ namespace TelegramRSS\AccessControl;
 
 use Revolt\EventLoop;
 use TelegramRSS\Config;
+use TelegramRSS\Logger;
 
 use TelegramRSS\Cache\JsonlFileStorage;
 
@@ -177,7 +178,7 @@ class AccessControl
             if ($password === $expectedPassword) {
                 return $username;
             }
-            Logger::getInstance()->notice('Invalid Basic Auth password', ['header' => $authorizationHeader, 'username' => $username, 'password' => $password]);
+            Logger::getInstance()->notice('Invalid Basic Auth password', ['username' => $username]);
         } else {
             Logger::getInstance()->notice('Basic Auth password not set', ['username' => $username]);
         }
@@ -202,13 +203,13 @@ class AccessControl
 
         $decoded = base64_decode($encodedPassword, true);
         if ($decoded === false || !str_contains($decoded, ':')) {
-            Logger::getInstance()->notice('Invalid Basic Auth header', ['header' => $authorizationHeader, 'decoded' => $decoded]);
+            Logger::getInstance()->notice('Invalid Basic Auth header');
             return null;
         }
 
         [$username, $password] = explode(':', $decoded, 2);
         if ($username === '') {
-            Logger::getInstance()->notice('Invalid Basic Auth username', ['header' => $authorizationHeader, 'decoded' => $decoded]);
+            Logger::getInstance()->notice('Invalid Basic Auth username');
             return null;
         }
 
