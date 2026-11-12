@@ -72,8 +72,8 @@ class Feed {
                 $description = '';
                 foreach ($item['preview'] as $url) {
                     if ($url['href'] && $url['image']) {
-                        $description .= "<a href=\"{$url['href']}\" target=\"_blank\" rel=\"nofollow\">";
-                        $description .= "<img src=\"{$url['image']}\" style=\"max-width:100%\"/>";
+                        $description .= '<a href="' . htmlspecialchars((string)$url['href'], ENT_QUOTES) . '" target="_blank" rel="nofollow">';
+                        $description .= '<img src="' . htmlspecialchars((string)$url['image'], ENT_QUOTES) . '" style="max-width:100%"/>';
                         $description .= '</a>';
                         $description .= '<br/>';
                     }
@@ -89,20 +89,20 @@ class Feed {
 
                     $webPagePreview = '';
                     if ($item['webpage']['site_name']) {
-                        $webPagePreview .= "<cite><b>{$item['webpage']['site_name']}</b></cite></br>";
+                        $webPagePreview .= '<cite><b>' . htmlspecialchars((string)$item['webpage']['site_name'], ENT_QUOTES) . '</b></cite></br>';
                     }
                     if ($item['webpage']['title']) {
-                        $webPagePreview .= "<b>{$item['webpage']['title']}</b></br>";
+                        $webPagePreview .= '<b>' . htmlspecialchars((string)$item['webpage']['title'], ENT_QUOTES) . '</b></br>';
                     }
                     if ($item['webpage']['description']) {
-                        $webPagePreview .= "{$item['webpage']['description']}</br>";
+                        $webPagePreview .= htmlspecialchars((string)$item['webpage']['description'], ENT_QUOTES) . '</br>';
                     }
                     if ($item['webpage']['preview']) {
-                        $webPagePreview .= "<img src=\"{$item['webpage']['preview']}\" style=\"max-width:100%\"/>";
+                        $webPagePreview .= '<img src="' . htmlspecialchars((string)$item['webpage']['preview'], ENT_QUOTES) . '" style="max-width:100%"/>';
                     }
 
                     if ($webPagePreview) {
-                        $cite  = $item['webpage']['url'] ? "cite=\"{$item['webpage']['url']}\"" : '';
+                        $cite  = $item['webpage']['url'] ? 'cite="' . htmlspecialchars((string)$item['webpage']['url'], ENT_QUOTES) . '"' : '';
                         $description .= "<blockquote {$cite}>";
                         $description .= $webPagePreview;
                         $description .= '</blockquote>';
