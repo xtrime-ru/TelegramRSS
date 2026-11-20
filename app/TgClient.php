@@ -351,7 +351,13 @@ class TgClient
         }
         $messages = [];
         if (!$this->isPremium) {
-            $messages = self::getArrayContents($this->get('getSponsoredMessages', $peer, $peer, cancellation: $cancellation), cancellation: $cancellation);
+            $messages = self::getContents(
+                $this->get('getSponsoredMessages', $peer, $peer, cancellation: $cancellation),
+                cancellation: $cancellation,
+            ) ?? [];
+            if (!is_array($messages)) {
+                throw new UnexpectedValueException('Invalid API response: expected array', HttpStatus::BAD_GATEWAY);
+            }
             /** @var list<\Amp\Future<void>> $futures */
             $futures = [];
             foreach ($messages as $message) {
