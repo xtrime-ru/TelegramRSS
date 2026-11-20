@@ -46,6 +46,23 @@ final class ApiResponseTest extends TestCase
         self::assertSame([], $this->client('{"response":[]}')->getFullInfo('test'));
     }
 
+    public function testNullSponsoredMessagesReturnEmptyList(): void
+    {
+        $delegate = Mockery::mock(DelegateHttpClient::class);
+        $delegate->shouldReceive('request')->twice()->andReturnUsing(
+            static function (Request $request): Response {
+                $body = match ($request->getUri()->getPath()) {
+                    '/api/getSelf' => '{"success":true,"response":{"premium":false},"errors":[]}',
+                    '/api/getSponsoredMessages' => '{"success":true,"response":null,"errors":[]}',
+                };
+                return new Response('1.1', 200, null, ['content-type' => 'application/json'], $body, $request);
+            },
+        );
+        $client = new TgClient('fake.test', 9503, 'test', 'test', new TelegramCache(false), new HttpClient($delegate, []));
+
+        self::assertSame([], $client->getSponsoredMessages('test'));
+    }
+
     public function testIntegerAndStringPeerIdsAreSupported(): void
     {
         self::assertSame('-100123', $this->client('{"response":-100123}')->getId('test', 'test'));
